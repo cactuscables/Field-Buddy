@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- Makes it mobile-friendly — scales to phone screen width -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <!-- PWA stuff — theme color for browser chrome, manifest for install -->
+  <meta name="theme-color" content="#16213e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Field Buddy">
+  <link rel="manifest" href="manifest.json">
+  <title>Field Buddy</title>
+
+  <style>
+    /* ========================================
+       BASE STYLES — Dark theme, mobile-first
+       ======================================== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      min-height: 100vh;
+      /* Prevent iOS bounce/overscroll */
+      overscroll-behavior: none;
+    }
+
+    /* ========================================
+       HEADER
+       ======================================== */
+    .header {
+      background: #16213e;
+      padding: 16px 20px;
+      text-align: center;
+      border-bottom: 2px solid #0f3460;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header h1 {
+      font-size: 20px;
+      color: #e94560;
+      letter-spacing: 1px;
+    }
+
+    /* ========================================
+       TAB NAVIGATION — Lookup / Notes / History
+       ======================================== */
+    .tab-bar {
+      display: flex;
+      background: #16213e;
+      border-bottom: 2px solid #0f3460;
+      position: sticky;
+      top: 54px;  /* below header */
+      z-index: 99;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 12px;
+      background: none;
+      border: none;
+      color: #8a8a9a;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      color: #e94560;
+      border-bottom-color: #e94560;
+    }
+
+    /* Tab content panels — only show the active one */
+    .tab-content {
+      display: none;
+      padding: 20px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* ========================================
+       FORM ELEMENTS — Inputs, selects, buttons
+       ======================================== */
+    label {
+      display: block;
+      font-size: 12px;
+      color: #8a8a9a;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+      margin-top: 16px;
+    }
+
+    label:first-child {
+      margin-top: 0;
+    }
+
+    input[type="text"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 12px 14px;
+      background: #0f3460;
+      border: 1px solid #1a4a7a;
+      border-radius: 8px;
+      color: #e0e0e0;
+      font-size: 16px; /* 16px prevents iOS zoom on focus */
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus,
+    select:focus,
+    textarea:focus {
+      border-color: #e94560;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 100px;
+    }
+
+    /* Primary action button */
+    .btn-primary {
+      width: 100%;
+      padding: 14px;
+      background: #e94560;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 20px;
+      letter-spacing: 0.5px;
+      transition: background 0.2s;
+    }
+
+    .btn-primary:active {
+      background: #c73650;
+    }
+
+    /* Secondary / outline button */
+    .btn-secondary {
+      width: 100%;
+      padding: 12px;
+      background: transparent;
+      color: #e94560;
+      border: 2px solid #e94560;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:active {
+      background: #e94560;
+      color: white;
+    }
+
+    /* Small inline button */
+    .btn-small {
+      padding: 8px 16px;
+      background: #0f3460;
+      color: #e0e0e0;
+      border: 1px solid #1a4a7a;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      margin-top: 6px;
+      margin-right: 6px;
+    }
+
+    .btn-small:active {
+      background: #1a4a7a;
+    }
+
+    /* ========================================
+       BRAND QUICK-PICK CHIPS
+       ======================================== */
+    .brand-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .brand-chip {
+      padding: 8px 14px;
+      background: #0f3460;
+      border: 1px solid #1a4a7a;
+      border-radius: 20px;
+      color: #c0c0d0;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .brand-chip.selected {
+      background: #e94560;
+      border-color: #e94560;
+      color: white;
+    }
+
+    /* ========================================
+       SEARCH RESULTS — Link list
+       ======================================== */
+    .results-section {
+      margin-top: 20px;
+      display: none;
+    }
+
+    .results-section.visible {
+      display: block;
+    }
+
+    .result-link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px;
+      background: #0f3460;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      text-decoration: none;
+      color: #e0e0e0;
+      border: 1px solid #1a4a7a;
+      transition: border-color 0.2s;
+    }
+
+    .result-link:active {
+      border-color: #e94560;
+    }
+
+    .result-link .site-name {
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .result-link .site-note {
+      font-size: 12px;
+      color: #8a8a9a;
+    }
+
+    .result-link .arrow {
+      color: #e94560;
+      font-size: 18px;
+    }
+
+    /* ========================================
+       NOTES SECTION
+       ======================================== */
+    .note-preview {
+      background: #0f3460;
+      border: 1px solid #1a4a7a;
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 16px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      color: #c0c0d0;
+      min-height: 120px;
+    }
+
+    /* Toast notification for "Copied!" feedback */
+    .toast {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #4caf50;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      opacity: 0;
+      transition: all 0.3s;
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ========================================
+       HISTORY SECTION
+       ======================================== */
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 14px;
+      background: #0f3460;
+      border: 1px solid #1a4a7a;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+
+    .history-item:active {
+      border-color: #e94560;
+    }
+
+    .history-model {
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .history-brand {
+      font-size: 12px;
+      color: #8a8a9a;
+    }
+
+    .history-date {
+      font-size: 12px;
+      color: #8a8a9a;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #8a8a9a;
+    }
+
+    /* ========================================
+       NOTE TYPE TOGGLE (Service Call vs Install)
+       ======================================== */
+    .toggle-group {
+      display: flex;
+      gap: 0;
+      margin-top: 8px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #1a4a7a;
+    }
+
+    .toggle-btn {
+      flex: 1;
+      padding: 10px;
+      background: #0f3460;
+      border: none;
+      color: #8a8a9a;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .toggle-btn.active {
+      background: #e94560;
+      color: white;
+    }
+
+    /* Bullet point rows */
+    .bullet-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .bullet-row span {
+      color: #e94560;
+      font-weight: bold;
+    }
+
+    .bullet-row input {
+      flex: 1;
+    }
+
+    .remove-bullet {
+      background: none;
+      border: none;
+      color: #8a8a9a;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 4px 8px;
+    }
+
+    /* ========================================
+       SAVED NOTES LIST
+       ======================================== */
+    .saved-note-item {
+      padding: 12px 14px;
+      background: #0f3460;
+      border: 1px solid #1a4a7a;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+
+    .saved-note-item:active {
+      border-color: #e94560;
+    }
+
+    .saved-note-title {
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .saved-note-meta {
+      font-size: 12px;
+      color: #8a8a9a;
+      margin-top: 4px;
+    }
+
+    .section-divider {
+      border: none;
+      border-top: 1px solid #1a4a7a;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ==================== HEADER ==================== -->
+  <div class="header">
+    <h1>FIELD BUDDY</h1>
+  </div>
+
+  <!-- ==================== TAB BAR ==================== -->
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="lookup">Lookup</button>
+    <button class="tab-btn" data-tab="notes">Notes</button>
+    <button class="tab-btn" data-tab="history">History</button>
+  </div>
+
+  <!-- ==================== LOOKUP TAB ==================== -->
+  <div id="lookup" class="tab-content active">
+    <label for="modelInput">Model Number</label>
+    <input type="text" id="modelInput" placeholder="e.g. KFGC506JSS05"
+           autocapitalize="characters" autocomplete="off" spellcheck="false">
+
+    <label>Brand</label>
+    <!-- Auto-detected brand shows here, or pick manually -->
+    <div class="brand-chips" id="brandChips">
+      <div class="brand-chip" data-brand="whirlpool">Whirlpool</div>
+      <div class="brand-chip" data-brand="maytag">Maytag</div>
+      <div class="brand-chip" data-brand="kitchenaid">KitchenAid</div>
+      <div class="brand-chip" data-brand="amana">Amana</div>
+      <div class="brand-chip" data-brand="samsung">Samsung</div>
+      <div class="brand-chip" data-brand="lg">LG</div>
+      <div class="brand-chip" data-brand="frigidaire">Frigidaire</div>
+      <div class="brand-chip" data-brand="electrolux">Electrolux</div>
+      <div class="brand-chip" data-brand="ge">GE</div>
+      <div class="brand-chip" data-brand="bosch">Bosch</div>
+      <div class="brand-chip" data-brand="thermador">Thermador</div>
+      <div class="brand-chip" data-brand="viking">Viking</div>
+    </div>
+
+    <button class="btn-primary" id="searchBtn">Search Parts Sites</button>
+
+    <!-- Search results appear here -->
+    <div class="results-section" id="resultsSection">
+      <label>Open Sites</label>
+      <div id="resultLinks"></div>
+      <button class="btn-secondary" id="openAllBtn">Open All Links</button>
+    </div>
+  </div>
+
+  <!-- ==================== NOTES TAB ==================== -->
+  <div id="notes" class="tab-content">
+    <label for="noteTitle">Job Title</label>
+    <input type="text" id="noteTitle" placeholder="e.g. Refrigerator not cooling">
+
+    <label for="noteModel">Model Number</label>
+    <input type="text" id="noteModel" placeholder="Auto-fills from Lookup tab"
+           autocapitalize="characters" autocomplete="off" spellcheck="false">
+
+    <label for="noteSerial">Serial Number</label>
+    <input type="text" id="noteSerial" placeholder="Enter serial number"
+           autocapitalize="characters" autocomplete="off" spellcheck="false">
+
+    <label>Note Type</label>
+    <div class="toggle-group">
+      <button class="toggle-btn active" data-type="service">Service Call</button>
+      <button class="toggle-btn" data-type="install">Install Labor</button>
+    </div>
+
+    <label>Notes</label>
+    <div id="bulletContainer">
+      <!-- Bullet point rows get added here -->
+    </div>
+    <button class="btn-small" id="addBulletBtn">+ Add bullet</button>
+
+    <label>Preview</label>
+    <div class="note-preview" id="notePreview"></div>
+
+    <button class="btn-primary" id="copyNoteBtn">Copy to Clipboard</button>
+    <button class="btn-secondary" id="saveNoteBtn">Save Note</button>
+    <button class="btn-secondary" id="clearNoteBtn">Clear</button>
+
+    <hr class="section-divider">
+    <label>Saved Notes</label>
+    <div id="savedNotesList"></div>
+  </div>
+
+  <!-- ==================== HISTORY TAB ==================== -->
+  <div id="history" class="tab-content">
+    <label>Recent Lookups</label>
+    <div id="historyList"></div>
+    <button class="btn-secondary" id="clearHistoryBtn" style="margin-top:16px">Clear History</button>
+  </div>
+
+  <!-- Toast notification -->
+  <div class="toast" id="toast">Copied!</div>
+
+  <script>
+    // ============================================================
+    // CONFIGURATION — Edit these URLs if site patterns change
+    // ============================================================
+
+    // Each brand maps to a list of sites to search.
+    // {model} gets replaced with the actual model number.
+    // "always" sites show for every brand, brand-specific sites add on top.
+
+    const SITES = {
+      // These show for EVERY brand
+      always: [
+        {
+          name: 'Marcone',
+          // Deep-link into Marcone search results for this model number
+          url: 'https://beta.marcone.com/Home/RunSearchPartModelList?searchString={model}&type=Part',
+          note: 'Pricing & availability'
+        },
+        {
+          name: 'Sears Parts Direct',
+          url: 'https://www.searspartsdirect.com/search?q={model}',
+          note: 'Parts breakdown'
+        },
+        {
+          name: 'Reliable Parts',
+          // Opens Reliable Parts search results
+          url: 'https://www.reliableparts.com/catalogsearch/result/?q={model}#models',
+          note: 'Parts lookup'
+        }
+      ],
+
+      // Brand-specific sites — these get ADDED to the "always" list
+      bosch: [
+        {
+          name: 'Bosch Parts',
+          url: 'https://www.bosch-home.com/us/owner-support/cleaners-accessories/spare-parts-test',
+          note: 'Manufacturer parts lookup'
+        }
+      ],
+      thermador: [
+        {
+          name: 'Thermador Parts',
+          url: 'https://www.thermador.com/us/support/spareparts',
+          note: 'Manufacturer parts lookup'
+        }
+      ],
+      viking: [
+        {
+          name: 'All Viking Parts',
+          url: 'https://www.allvikingparts.com/',
+          note: 'Part numbers'
+        }
+      ],
+      ge: [
+        {
+          name: 'GE Parts',
+          url: 'https://www.geapplianceparts.com/store/parts/search/model/{model}',
+          note: 'Manufacturer parts lookup'
+        }
+      ]
+    };
+
+    // ============================================================
+    // BRAND AUTO-DETECTION
+    // Model number prefixes mapped to brands.
+    // These are common patterns — not exhaustive. Manual override
+    // is always available via the chips.
+    // ============================================================
+
+    const BRAND_PATTERNS = [
+      // KitchenAid — starts with K (ranges, dishwashers, fridges)
+      { prefix: /^K/i, brand: 'kitchenaid' },
+      // Whirlpool — starts with W
+      { prefix: /^W/i, brand: 'whirlpool' },
+      // Maytag — starts with M
+      { prefix: /^M/i, brand: 'maytag' },
+      // Amana — starts with A (but be careful, not all A-models are Amana)
+      { prefix: /^A/i, brand: 'amana' },
+      // Samsung — common prefixes
+      { prefix: /^(RF|WF|DW|NE|NX|RS|RT|ME|MC|RB|RH|WA|DV|WV)/i, brand: 'samsung' },
+      // LG — common prefixes
+      { prefix: /^(LR|WM|LD|LDF|LSE|LDE|LT|LW|DL|LRMVS|LRFXS|LFXS)/i, brand: 'lg' },
+      // Frigidaire — starts with FF, FG, FRT
+      { prefix: /^(FF|FG|FRT|FGHB|FFSS|FGHS)/i, brand: 'frigidaire' },
+      // Electrolux — starts with EI, EW, EFLS
+      { prefix: /^(EI|EW|EFLS|ELF)/i, brand: 'electrolux' },
+      // GE — common prefixes (lots of variation)
+      { prefix: /^(GS|GT|JB|GFW|GDT|PFE|PSE|JGB|GNE|PYE|GDF|PDP|PDT)/i, brand: 'ge' },
+      // Bosch — starts with SH (dishwashers), B, HBL, HGI
+      { prefix: /^(SH|HBL|HGI|HDI|NGM|NIT|SHPM|SHEM|B[0-9])/i, brand: 'bosch' },
+      // Thermador — common prefixes
+      { prefix: /^(PRD|PRL|SGS|DWHD|PODS|MED|T[0-9]{2})/i, brand: 'thermador' },
+      // Viking — starts with V
+      { prefix: /^V/i, brand: 'viking' },
+    ];
+
+    // ============================================================
+    // APP STATE
+    // ============================================================
+
+    let selectedBrand = null;
+    let noteType = 'service'; // 'service' or 'install'
+
+    // ============================================================
+    // TAB SWITCHING
+    // ============================================================
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Deactivate all tabs and panels
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        // Activate clicked tab and its panel
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
+      });
+    });
+
+    // ============================================================
+    // BRAND DETECTION & SELECTION
+    // ============================================================
+
+    const modelInput = document.getElementById('modelInput');
+    const brandChips = document.querySelectorAll('.brand-chip');
+
+    // Auto-detect brand as user types
+    modelInput.addEventListener('input', () => {
+      const model = modelInput.value.trim().toUpperCase();
+      if (model.length < 2) return;
+
+      // Try to match a brand pattern
+      for (const pattern of BRAND_PATTERNS) {
+        if (pattern.prefix.test(model)) {
+          selectBrand(pattern.brand);
+          return;
+        }
+      }
+    });
+
+    // Manual brand selection via chips
+    brandChips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        selectBrand(chip.dataset.brand);
+      });
+    });
+
+    function selectBrand(brand) {
+      selectedBrand = brand;
+      // Update chip visual state
+      brandChips.forEach(c => {
+        c.classList.toggle('selected', c.dataset.brand === brand);
+      });
+    }
+
+    // ============================================================
+    // SEARCH — Generate links to parts sites
+    // ============================================================
+
+    const searchBtn = document.getElementById('searchBtn');
+    const resultsSection = document.getElementById('resultsSection');
+    const resultLinks = document.getElementById('resultLinks');
+    const openAllBtn = document.getElementById('openAllBtn');
+
+    searchBtn.addEventListener('click', () => {
+      const model = modelInput.value.trim();
+      if (!model) {
+        modelInput.focus();
+        return;
+      }
+
+      // Build list of sites to show
+      let sites = [...SITES.always];
+
+      // Add brand-specific sites if a brand is selected
+      if (selectedBrand && SITES[selectedBrand]) {
+        sites = [...sites, ...SITES[selectedBrand]];
+      }
+
+      // Generate the links
+      resultLinks.innerHTML = '';
+      const urls = []; // for "Open All"
+
+      sites.forEach(site => {
+        const url = site.url.replace('{model}', encodeURIComponent(model));
+        urls.push(url);
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.className = 'result-link';
+        link.innerHTML = `
+          <div>
+            <div class="site-name">${site.name}</div>
+            <div class="site-note">${site.note}</div>
+          </div>
+          <div class="arrow">&rsaquo;</div>
+        `;
+        resultLinks.appendChild(link);
+      });
+
+      resultsSection.classList.add('visible');
+
+      // Also auto-fill the notes tab model field
+      document.getElementById('noteModel').value = model;
+
+      // Save to search history
+      saveToHistory(model, selectedBrand);
+
+      // Copy model number to clipboard for easy pasting (e.g., into Marcone search)
+      copyToClipboard(model);
+    });
+
+    // Open all links at once
+    openAllBtn.addEventListener('click', () => {
+      const links = resultLinks.querySelectorAll('a');
+      links.forEach(link => {
+        window.open(link.href, '_blank');
+      });
+    });
+
+    // ============================================================
+    // SEARCH HISTORY — Stored in localStorage
+    // ============================================================
+
+    function saveToHistory(model, brand) {
+      const history = JSON.parse(localStorage.getItem('fb_history') || '[]');
+      // Add to front, remove duplicates
+      const filtered = history.filter(h => h.model !== model);
+      filtered.unshift({
+        model: model,
+        brand: brand || 'unknown',
+        date: new Date().toLocaleDateString()
+      });
+      // Keep last 50 entries
+      localStorage.setItem('fb_history', JSON.stringify(filtered.slice(0, 50)));
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const history = JSON.parse(localStorage.getItem('fb_history') || '[]');
+      const list = document.getElementById('historyList');
+
+      if (history.length === 0) {
+        list.innerHTML = '<div class="empty-state">No searches yet</div>';
+        return;
+      }
+
+      list.innerHTML = '';
+      history.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'history-item';
+        div.innerHTML = `
+          <div>
+            <div class="history-model">${item.model}</div>
+            <div class="history-brand">${item.brand}</div>
+          </div>
+          <div class="history-date">${item.date}</div>
+        `;
+        // Clicking a history item loads it into the lookup tab
+        div.addEventListener('click', () => {
+          modelInput.value = item.model;
+          if (item.brand && item.brand !== 'unknown') {
+            selectBrand(item.brand);
+          }
+          // Switch to lookup tab
+          document.querySelector('[data-tab="lookup"]').click();
+        });
+        list.appendChild(div);
+      });
+    }
+
+    document.getElementById('clearHistoryBtn').addEventListener('click', () => {
+      localStorage.removeItem('fb_history');
+      renderHistory();
+    });
+
+    // ============================================================
+    // NOTES — Workorder template builder
+    // ============================================================
+
+    const bulletContainer = document.getElementById('bulletContainer');
+    const addBulletBtn = document.getElementById('addBulletBtn');
+    const notePreview = document.getElementById('notePreview');
+
+    // Note type toggle (Service Call vs Install Labor)
+    document.querySelectorAll('.toggle-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        noteType = btn.dataset.type;
+        updateNotePreview();
+      });
+    });
+
+    // Add a bullet point row
+    function addBullet(value = '') {
+      const row = document.createElement('div');
+      row.className = 'bullet-row';
+      row.innerHTML = `
+        <span>-</span>
+        <input type="text" class="bullet-input" placeholder="Note..." value="${value}">
+        <button class="remove-bullet">&times;</button>
+      `;
+      // Remove bullet on X click
+      row.querySelector('.remove-bullet').addEventListener('click', () => {
+        row.remove();
+        updateNotePreview();
+      });
+      // Update preview as user types
+      row.querySelector('input').addEventListener('input', updateNotePreview);
+      bulletContainer.appendChild(row);
+      // Focus the new input
+      row.querySelector('input').focus();
+      updateNotePreview();
+    }
+
+    addBulletBtn.addEventListener('click', () => addBullet());
+
+    // Start with 3 empty bullets
+    addBullet();
+    addBullet();
+    addBullet();
+
+    // Listen for changes on all note fields
+    ['noteTitle', 'noteModel', 'noteSerial'].forEach(id => {
+      document.getElementById(id).addEventListener('input', updateNotePreview);
+    });
+
+    // Build the formatted note preview
+    function updateNotePreview() {
+      const title = document.getElementById('noteTitle').value || '(Title)';
+      const model = document.getElementById('noteModel').value || '(Model)';
+      const serial = document.getElementById('noteSerial').value || '(Serial)';
+      const today = new Date().toLocaleDateString('en-US', {
+        month: 'numeric', day: 'numeric', year: 'numeric'
+      });
+
+      // Gather bullet points (skip empty ones)
+      const bullets = [];
+      document.querySelectorAll('.bullet-input').forEach(input => {
+        if (input.value.trim()) {
+          bullets.push(`- ${input.value.trim()}`);
+        }
+      });
+      const bulletText = bullets.length > 0
+        ? bullets.join('\n')
+        : '- ';
+
+      // Build the closing line based on note type
+      const closingLine = noteType === 'service'
+        ? `### **Service call completed - ${today}**`
+        : `### **Install Labor Completed - ${today}**`;
+
+      // Assemble the full note in Dustin's format
+      const note = `## ${title}
+___
+
+M: ${model}
+
+S: ${serial}
+
+${bulletText}
+
+${closingLine}`;
+
+      notePreview.textContent = note;
+    }
+
+    // Initial preview render
+    updateNotePreview();
+
+    // ============================================================
+    // COPY NOTE TO CLIPBOARD
+    // ============================================================
+
+    document.getElementById('copyNoteBtn').addEventListener('click', () => {
+      const text = notePreview.textContent;
+      if (copyToClipboard(text)) {
+        showToast('Copied!');
+      } else {
+        showToast('Copy failed — long press the preview to select manually');
+      }
+    });
+
+    // ============================================================
+    // SAVE / LOAD NOTES — localStorage
+    // ============================================================
+
+    document.getElementById('saveNoteBtn').addEventListener('click', () => {
+      const title = document.getElementById('noteTitle').value || 'Untitled';
+      const model = document.getElementById('noteModel').value;
+      const serial = document.getElementById('noteSerial').value;
+      const bullets = [];
+      document.querySelectorAll('.bullet-input').forEach(input => {
+        bullets.push(input.value);
+      });
+
+      const notes = JSON.parse(localStorage.getItem('fb_notes') || '[]');
+      notes.unshift({
+        id: Date.now(),
+        title: title,
+        model: model,
+        serial: serial,
+        bullets: bullets,
+        noteType: noteType,
+        date: new Date().toLocaleDateString(),
+        fullText: notePreview.textContent
+      });
+      // Keep last 100 notes
+      localStorage.setItem('fb_notes', JSON.stringify(notes.slice(0, 100)));
+      showToast('Note saved!');
+      renderSavedNotes();
+    });
+
+    document.getElementById('clearNoteBtn').addEventListener('click', () => {
+      document.getElementById('noteTitle').value = '';
+      document.getElementById('noteModel').value = '';
+      document.getElementById('noteSerial').value = '';
+      bulletContainer.innerHTML = '';
+      addBullet();
+      addBullet();
+      addBullet();
+      updateNotePreview();
+    });
+
+    function renderSavedNotes() {
+      const notes = JSON.parse(localStorage.getItem('fb_notes') || '[]');
+      const list = document.getElementById('savedNotesList');
+
+      if (notes.length === 0) {
+        list.innerHTML = '<div class="empty-state">No saved notes</div>';
+        return;
+      }
+
+      list.innerHTML = '';
+      notes.forEach(note => {
+        const div = document.createElement('div');
+        div.className = 'saved-note-item';
+        div.innerHTML = `
+          <div class="saved-note-title">${note.title}</div>
+          <div class="saved-note-meta">M: ${note.model || '—'} | ${note.date}</div>
+        `;
+        // Click to load the note back into the form
+        div.addEventListener('click', () => {
+          document.getElementById('noteTitle').value = note.title;
+          document.getElementById('noteModel').value = note.model || '';
+          document.getElementById('noteSerial').value = note.serial || '';
+
+          // Restore bullet points
+          bulletContainer.innerHTML = '';
+          if (note.bullets && note.bullets.length > 0) {
+            note.bullets.forEach(b => addBullet(b));
+          } else {
+            addBullet();
+          }
+
+          // Restore note type
+          noteType = note.noteType || 'service';
+          document.querySelectorAll('.toggle-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.type === noteType);
+          });
+
+          updateNotePreview();
+          showToast('Note loaded');
+        });
+        list.appendChild(div);
+      });
+    }
+
+    // ============================================================
+    // CLIPBOARD — Works on HTTP, iOS Safari, and older browsers
+    // The modern Clipboard API needs HTTPS, so we use the older
+    // execCommand approach with iOS-specific workarounds.
+    // ============================================================
+
+    function copyToClipboard(text) {
+      // Try modern API first (works on HTTPS / localhost)
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text);
+        return true;
+      }
+
+      // Fallback: create a temporary textarea and use execCommand
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+
+      // Prevent iOS zoom and keep it off-screen
+      textarea.style.fontSize = '16px';
+      textarea.style.position = 'fixed';
+      textarea.style.left = '0';
+      textarea.style.top = '0';
+      textarea.style.opacity = '0';
+
+      // iOS Safari needs these attributes
+      textarea.setAttribute('readonly', '');
+      textarea.setAttribute('contenteditable', 'true');
+
+      document.body.appendChild(textarea);
+
+      // iOS-specific selection method
+      if (navigator.userAgent.match(/ipad|iphone/i)) {
+        const range = document.createRange();
+        range.selectNodeContents(textarea);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        textarea.setSelectionRange(0, text.length);
+      } else {
+        textarea.select();
+      }
+
+      let success = false;
+      try {
+        success = document.execCommand('copy');
+      } catch (e) {
+        success = false;
+      }
+
+      document.body.removeChild(textarea);
+      return success;
+    }
+
+    // ============================================================
+    // TOAST NOTIFICATION
+    // ============================================================
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2000);
+    }
+
+    // ============================================================
+    // INITIALIZATION
+    // ============================================================
+
+    // Render history and saved notes on load
+    renderHistory();
+    renderSavedNotes();
+
+    // Register service worker for offline support
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js')
+        .then(() => console.log('Service worker registered'))
+        .catch((err) => console.log('SW registration failed:', err));
+    }
+  </script>
+
+</body>
+</html>
