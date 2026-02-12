@@ -10,6 +10,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Field Buddy">
   <link rel="manifest" href="manifest.json">
+  <!-- Tesseract.js for OCR — runs entirely in the browser, no server needed -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <title>Field Buddy</title>
 
   <style>
@@ -430,6 +432,143 @@
       border-top: 1px solid #1a4a7a;
       margin: 20px 0;
     }
+
+    /* ========================================
+       OCR / CAMERA FEATURE
+       ======================================== */
+    .input-with-camera {
+      display: flex;
+      gap: 8px;
+    }
+
+    .input-with-camera input {
+      flex: 1;
+    }
+
+    .camera-btn {
+      width: 48px;
+      height: 48px;
+      background: #e94560;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 22px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .camera-btn:active {
+      background: #c73650;
+    }
+
+    /* Hidden file input for camera */
+    #cameraInput {
+      display: none;
+    }
+
+    /* OCR processing overlay */
+    .ocr-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 200;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .ocr-overlay.visible {
+      display: flex;
+    }
+
+    .ocr-status {
+      color: #e94560;
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .ocr-progress {
+      width: 200px;
+      height: 6px;
+      background: #0f3460;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    .ocr-progress-bar {
+      height: 100%;
+      background: #e94560;
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    .ocr-preview {
+      max-width: 300px;
+      max-height: 200px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      object-fit: contain;
+    }
+
+    /* OCR results — list of detected text strings to pick from */
+    .ocr-results {
+      width: 100%;
+      max-width: 400px;
+      max-height: 50vh;
+      overflow-y: auto;
+    }
+
+    .ocr-results label {
+      color: #e94560;
+      margin-bottom: 8px;
+    }
+
+    .ocr-result-item {
+      padding: 12px 14px;
+      background: #0f3460;
+      border: 1px solid #1a4a7a;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      color: #e0e0e0;
+      font-family: monospace;
+      font-size: 15px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    .ocr-result-item:active {
+      border-color: #e94560;
+      background: #1a4a7a;
+    }
+
+    .ocr-result-item .ocr-tag {
+      font-family: -apple-system, sans-serif;
+      font-size: 11px;
+      color: #8a8a9a;
+      display: block;
+      margin-top: 4px;
+    }
+
+    .ocr-close-btn {
+      margin-top: 16px;
+      padding: 12px 32px;
+      background: transparent;
+      color: #8a8a9a;
+      border: 1px solid #8a8a9a;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+    }
   </style>
 </head>
 
@@ -450,8 +589,14 @@
   <!-- ==================== LOOKUP TAB ==================== -->
   <div id="lookup" class="tab-content active">
     <label for="modelInput">Model Number</label>
-    <input type="text" id="modelInput" placeholder="e.g. KFGC506JSS05"
-           autocapitalize="characters" autocomplete="off" spellcheck="false">
+    <div class="input-with-camera">
+      <input type="text" id="modelInput" placeholder="e.g. KFGC506JSS05"
+             autocapitalize="characters" autocomplete="off" spellcheck="false">
+      <!-- Camera button — opens phone camera for OCR -->
+      <button class="camera-btn" id="cameraBtn" title="Scan model tag">&#128247;</button>
+    </div>
+    <!-- Hidden file input that triggers the camera -->
+    <input type="file" id="cameraInput" accept="image/*" capture="environment">
 
     <label>Brand</label>
     <!-- Auto-detected brand shows here, or pick manually -->
@@ -522,6 +667,17 @@
     <label>Recent Lookups</label>
     <div id="historyList"></div>
     <button class="btn-secondary" id="clearHistoryBtn" style="margin-top:16px">Clear History</button>
+  </div>
+
+  <!-- OCR Processing Overlay -->
+  <div class="ocr-overlay" id="ocrOverlay">
+    <img class="ocr-preview" id="ocrPreview" alt="Captured image">
+    <div class="ocr-status" id="ocrStatus">Reading tag...</div>
+    <div class="ocr-progress">
+      <div class="ocr-progress-bar" id="ocrProgressBar"></div>
+    </div>
+    <div class="ocr-results" id="ocrResults"></div>
+    <button class="ocr-close-btn" id="ocrCloseBtn">Cancel</button>
   </div>
 
   <!-- Toast notification -->
@@ -1052,6 +1208,170 @@ ${closingLine}`;
       toast.textContent = message;
       toast.classList.add('show');
       setTimeout(() => toast.classList.remove('show'), 2000);
+    }
+
+    // ============================================================
+    // OCR — Camera capture and text extraction
+    // Uses Tesseract.js to read model/serial tags from photos.
+    // Runs entirely in the browser — no server or API key needed.
+    // ============================================================
+
+    const cameraBtn = document.getElementById('cameraBtn');
+    const cameraInput = document.getElementById('cameraInput');
+    const ocrOverlay = document.getElementById('ocrOverlay');
+    const ocrPreview = document.getElementById('ocrPreview');
+    const ocrStatus = document.getElementById('ocrStatus');
+    const ocrProgressBar = document.getElementById('ocrProgressBar');
+    const ocrResults = document.getElementById('ocrResults');
+    const ocrCloseBtn = document.getElementById('ocrCloseBtn');
+
+    // Camera button opens the file picker (which triggers camera on mobile)
+    cameraBtn.addEventListener('click', () => {
+      cameraInput.click();
+    });
+
+    // When a photo is captured/selected
+    cameraInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      // Show the overlay with preview
+      const imageUrl = URL.createObjectURL(file);
+      ocrPreview.src = imageUrl;
+      ocrOverlay.classList.add('visible');
+      ocrStatus.textContent = 'Reading tag...';
+      ocrProgressBar.style.width = '0%';
+      ocrResults.innerHTML = '';
+      ocrCloseBtn.textContent = 'Cancel';
+
+      try {
+        // Run Tesseract OCR on the image
+        const result = await Tesseract.recognize(file, 'eng', {
+          logger: (info) => {
+            // Update progress bar during recognition
+            if (info.status === 'recognizing text') {
+              const pct = Math.round(info.progress * 100);
+              ocrProgressBar.style.width = pct + '%';
+              ocrStatus.textContent = `Reading... ${pct}%`;
+            }
+          }
+        });
+
+        // Extract all text lines from the result
+        const rawText = result.data.text;
+        ocrStatus.textContent = 'Select model or serial number:';
+        ocrProgressBar.style.width = '100%';
+
+        // Parse the OCR text into candidate strings
+        // Split by lines, then by spaces/tabs, filter for likely model/serial patterns
+        const candidates = parseOcrText(rawText);
+
+        if (candidates.length === 0) {
+          ocrResults.innerHTML = '<div class="empty-state">No model/serial numbers detected. Try a clearer photo.</div>';
+        } else {
+          // Show each candidate as a tappable button
+          ocrResults.innerHTML = '';
+          candidates.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'ocr-result-item';
+            div.innerHTML = `${item.text}<span class="ocr-tag">${item.tag}</span>`;
+
+            // Tapping a result fills it into the appropriate field
+            div.addEventListener('click', () => {
+              if (item.tag === 'Likely serial') {
+                // Put it in the serial field on the Notes tab
+                document.getElementById('noteSerial').value = item.text;
+                showToast('Serial filled in Notes tab');
+              } else {
+                // Put it in the model number field and trigger brand detection
+                modelInput.value = item.text;
+                modelInput.dispatchEvent(new Event('input'));
+                // Also fill the notes tab model field
+                document.getElementById('noteModel').value = item.text;
+                showToast('Model number set: ' + item.text);
+              }
+              ocrOverlay.classList.remove('visible');
+              // Reset file input so same photo can be re-captured
+              cameraInput.value = '';
+            });
+
+            ocrResults.appendChild(div);
+          });
+        }
+        ocrCloseBtn.textContent = 'Close';
+
+      } catch (err) {
+        ocrStatus.textContent = 'OCR failed — try again';
+        ocrCloseBtn.textContent = 'Close';
+        console.error('OCR error:', err);
+      }
+
+      // Clean up the object URL
+      URL.revokeObjectURL(imageUrl);
+    });
+
+    // Close the OCR overlay
+    ocrCloseBtn.addEventListener('click', () => {
+      ocrOverlay.classList.remove('visible');
+      cameraInput.value = '';
+    });
+
+    // ============================================================
+    // OCR TEXT PARSING
+    // Extracts likely model and serial numbers from raw OCR text.
+    // Model numbers: typically 8-15 chars, mix of letters and numbers
+    // Serial numbers: typically longer, more numeric
+    // ============================================================
+
+    function parseOcrText(rawText) {
+      const candidates = [];
+      const seen = new Set();
+
+      // Split text into individual "words" (anything separated by whitespace or common delimiters)
+      const tokens = rawText
+        .replace(/[|\\\/\[\]{}()]/g, ' ')  // Replace common OCR artifacts
+        .split(/[\s,;:]+/)                   // Split on whitespace and punctuation
+        .map(t => t.trim().replace(/^[.-]+|[.-]+$/g, '')) // Clean leading/trailing dots/dashes
+        .filter(t => t.length >= 4);         // Must be at least 4 chars
+
+      tokens.forEach(token => {
+        const upper = token.toUpperCase();
+        if (seen.has(upper)) return;
+
+        // Skip common words that OCR might pick up
+        const skipWords = ['MODEL', 'SERIAL', 'NUMBER', 'TYPE', 'STYLE', 'COLOR',
+          'MADE', 'USA', 'CHINA', 'MEXICO', 'DATE', 'MFG', 'PROD', 'RATING',
+          'VOLTS', 'AMPS', 'WATTS', 'HERTZ', 'PHASE', 'THIS', 'THE', 'FOR',
+          'WITH', 'FROM', 'LISTED', '?"?"'];
+        if (skipWords.includes(upper)) return;
+
+        // Must contain at least one letter AND one number (model/serial pattern)
+        const hasLetter = /[A-Za-z]/.test(token);
+        const hasNumber = /[0-9]/.test(token);
+        if (!hasLetter || !hasNumber) return;
+
+        // Length check: model numbers are typically 6-20 chars
+        if (upper.length < 5 || upper.length > 25) return;
+
+        seen.add(upper);
+
+        // Try to guess if it's a model or serial number
+        // Serial numbers tend to be longer and more numeric
+        const digitRatio = (upper.match(/[0-9]/g) || []).length / upper.length;
+        const tag = (upper.length > 14 || digitRatio > 0.7)
+          ? 'Likely serial'
+          : 'Likely model';
+
+        candidates.push({ text: upper, tag: tag });
+      });
+
+      // Sort: likely models first, then serials
+      candidates.sort((a, b) => {
+        if (a.tag === b.tag) return 0;
+        return a.tag === 'Likely model' ? -1 : 1;
+      });
+
+      return candidates;
     }
 
     // ============================================================
