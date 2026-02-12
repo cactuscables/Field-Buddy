@@ -903,9 +903,10 @@ ${closingLine}`;
     // COPY NOTE TO CLIPBOARD
     // ============================================================
 
-    document.getElementById('copyNoteBtn').addEventListener('click', () => {
+    document.getElementById('copyNoteBtn').addEventListener('click', async () => {
       const text = notePreview.textContent;
-      if (copyToClipboard(text)) {
+      const success = await copyToClipboard(text);
+      if (success) {
         showToast('Copied!');
       } else {
         showToast('Copy failed — long press the preview to select manually');
@@ -998,48 +999,39 @@ ${closingLine}`;
     }
 
     // ============================================================
-    // CLIPBOARD — Uses execCommand as primary method since it
-    // works on HTTP, Firefox, and iOS Safari. The modern
-    // Clipboard API is HTTPS-only and has permission quirks.
+    // CLIPBOARD — Async function that tries the modern Clipboard
+    // API first (needs HTTPS, which GitHub Pages gives us), then
+    // falls back to the old execCommand method for HTTP/older browsers.
     // ============================================================
 
-    function copyToClipboard(text) {
-      // Always use the execCommand approach — it's the most reliable
-      // across browsers, HTTP/HTTPS, and mobile
+    async function copyToClipboard(text) {
+      // Method 1: Modern Clipboard API (works on HTTPS)
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch (e) {
+          // Permission denied or other error — try fallback
+          console.log('Clipboard API failed, trying fallback:', e);
+        }
+      }
+
+      // Method 2: Old-school execCommand fallback (HTTP / older browsers)
       const textarea = document.createElement('textarea');
       textarea.value = text;
-
-      // 16px font prevents iOS from zooming when focusing
       textarea.style.fontSize = '16px';
-      // Position it on-screen but invisible (off-screen elements
-      // can fail on some mobile browsers)
       textarea.style.position = 'fixed';
       textarea.style.left = '0';
       textarea.style.top = '0';
       textarea.style.width = '1px';
       textarea.style.height = '1px';
       textarea.style.opacity = '0.01';
-      textarea.style.zIndex = '-1';
-
-      // iOS Safari workarounds
       textarea.setAttribute('readonly', '');
-      textarea.setAttribute('contenteditable', 'true');
 
       document.body.appendChild(textarea);
-
-      // Select the text — different methods for iOS vs everything else
-      if (/ipad|iphone/i.test(navigator.userAgent)) {
-        const range = document.createRange();
-        range.selectNodeContents(textarea);
-        const selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(range);
-        textarea.setSelectionRange(0, text.length);
-      } else {
-        textarea.focus();
-        textarea.select();
-        textarea.setSelectionRange(0, text.length);
-      }
+      textarea.focus();
+      textarea.select();
+      textarea.setSelectionRange(0, text.length);
 
       let success = false;
       try {
@@ -1047,15 +1039,7 @@ ${closingLine}`;
       } catch (e) {
         success = false;
       }
-
       document.body.removeChild(textarea);
-
-      // If execCommand failed, try modern API as last resort
-      if (!success && navigator.clipboard) {
-        navigator.clipboard.writeText(text).catch(() => {});
-        success = true; // optimistic — can't know for sure
-      }
-
       return success;
     }
 
