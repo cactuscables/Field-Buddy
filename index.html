@@ -1230,25 +1230,69 @@ ${closingLine}`;
       cameraInput.click();
     });
 
+    // ---- Image preprocessing: boost contrast for better OCR ----
+    // Appliance tags are often in bad lighting or at angles.
+    // Converting to high-contrast B&W helps Tesseract significantly.
+    function preprocessImage(file) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+
+          // Draw original image
+          ctx.drawImage(img, 0, 0);
+
+          // Get pixel data and convert to high-contrast B&W
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imageData.data;
+
+          for (let i = 0; i < data.length; i += 4) {
+            // Grayscale using luminance formula
+            let gray = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+            // Contrast boost
+            gray = ((gray / 255 - 0.5) * 1.8 + 0.5) * 255;
+            gray = Math.max(0, Math.min(255, gray));
+            // Threshold to pure B&W
+            gray = gray > 140 ? 255 : 0;
+            data[i] = gray;
+            data[i+1] = gray;
+            data[i+2] = gray;
+          }
+
+          ctx.putImageData(imageData, 0, 0);
+          canvas.toBlob((blob) => {
+            URL.revokeObjectURL(img.src);
+            resolve(blob);
+          }, 'image/png');
+        };
+        img.src = URL.createObjectURL(file);
+      });
+    }
+
     // When a photo is captured/selected
     cameraInput.addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
 
-      // Show the overlay with preview
+      // Show the overlay with preview of original image
       const imageUrl = URL.createObjectURL(file);
       ocrPreview.src = imageUrl;
       ocrOverlay.classList.add('visible');
-      ocrStatus.textContent = 'Reading tag...';
+      ocrStatus.textContent = 'Enhancing image...';
       ocrProgressBar.style.width = '0%';
       ocrResults.innerHTML = '';
       ocrCloseBtn.textContent = 'Cancel';
 
       try {
-        // Run Tesseract OCR on the image
-        const result = await Tesseract.recognize(file, 'eng', {
+        // Step 1: Preprocess image for better OCR accuracy
+        const processedBlob = await preprocessImage(file);
+
+        // Step 2: Run Tesseract OCR on the enhanced image
+        const result = await Tesseract.recognize(processedBlob, 'eng', {
           logger: (info) => {
-            // Update progress bar during recognition
             if (info.status === 'recognizing text') {
               const pct = Math.round(info.progress * 100);
               ocrProgressBar.style.width = pct + '%';
@@ -1257,66 +1301,40 @@ ${closingLine}`;
           }
         });
 
-        // Extract all text lines from the result
         const rawText = result.data.text;
-        ocrStatus.textContent = 'Select model or serial number:';
         ocrProgressBar.style.width = '100%';
 
-        // Parse the OCR text into candidate strings
-        // Split by lines, then by spaces/tabs, filter for likely model/serial patterns
+        // Step 3: Parse results
         const candidates = parseOcrText(rawText);
 
-        if (candidates.length === 0 && rawText.trim().length === 0) {
-          ocrResults.innerHTML = '<div class="empty-state">No text detected. Try a clearer photo with good lighting.</div>';
-        } else if (candidates.length === 0) {
-          // Parsing found nothing but OCR did get text — show raw lines as fallback
-          const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-          ocrResults.innerHTML = '';
-
-          // Add a "raw text" section so user can pick from anything detected
-          lines.forEach(line => {
-            // Split line into individual tokens too
-            const words = line.split(/\s+/).filter(w => w.length >= 3);
-            words.forEach(word => {
-              const div = document.createElement('div');
-              div.className = 'ocr-result-item';
-              div.innerHTML = `${word}<span class="ocr-tag">Tap to use as model #</span>`;
-              div.addEventListener('click', () => {
-                const clean = word.replace(/[^A-Za-z0-9\-]/g, '');
-                modelInput.value = clean;
-                modelInput.dispatchEvent(new Event('input'));
-                document.getElementById('noteModel').value = clean;
-                showToast('Model number set: ' + clean);
-                ocrOverlay.classList.remove('visible');
-                cameraInput.value = '';
-              });
-              ocrResults.appendChild(div);
-            });
-          });
+        if (candidates.length === 0) {
+          ocrStatus.textContent = 'Could not find model/serial numbers';
+          ocrResults.innerHTML = '<div class="empty-state">' +
+            'Tips for better results:<br><br>' +
+            '- Hold phone straight, parallel to the tag<br>' +
+            '- Tag should fill most of the frame<br>' +
+            '- Good lighting, avoid shadows<br>' +
+            '- Wipe dust/grease off the tag' +
+            '</div>';
         } else {
-          // Show each candidate as a tappable button
+          ocrStatus.textContent = 'Select model or serial number:';
           ocrResults.innerHTML = '';
           candidates.forEach(item => {
             const div = document.createElement('div');
             div.className = 'ocr-result-item';
             div.innerHTML = `${item.text}<span class="ocr-tag">${item.tag}</span>`;
 
-            // Tapping a result fills it into the appropriate field
             div.addEventListener('click', () => {
-              if (item.tag === 'Likely serial') {
-                // Put it in the serial field on the Notes tab
+              if (item.tag.includes('serial') || item.tag.includes('Serial')) {
                 document.getElementById('noteSerial').value = item.text;
                 showToast('Serial filled in Notes tab');
               } else {
-                // Put it in the model number field and trigger brand detection
                 modelInput.value = item.text;
                 modelInput.dispatchEvent(new Event('input'));
-                // Also fill the notes tab model field
                 document.getElementById('noteModel').value = item.text;
                 showToast('Model number set: ' + item.text);
               }
               ocrOverlay.classList.remove('visible');
-              // Reset file input so same photo can be re-captured
               cameraInput.value = '';
             });
 
@@ -1331,7 +1349,6 @@ ${closingLine}`;
         console.error('OCR error:', err);
       }
 
-      // Clean up the object URL
       URL.revokeObjectURL(imageUrl);
     });
 
