@@ -1266,8 +1266,33 @@ ${closingLine}`;
         // Split by lines, then by spaces/tabs, filter for likely model/serial patterns
         const candidates = parseOcrText(rawText);
 
-        if (candidates.length === 0) {
-          ocrResults.innerHTML = '<div class="empty-state">No model/serial numbers detected. Try a clearer photo.</div>';
+        if (candidates.length === 0 && rawText.trim().length === 0) {
+          ocrResults.innerHTML = '<div class="empty-state">No text detected. Try a clearer photo with good lighting.</div>';
+        } else if (candidates.length === 0) {
+          // Parsing found nothing but OCR did get text — show raw lines as fallback
+          const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+          ocrResults.innerHTML = '';
+
+          // Add a "raw text" section so user can pick from anything detected
+          lines.forEach(line => {
+            // Split line into individual tokens too
+            const words = line.split(/\s+/).filter(w => w.length >= 3);
+            words.forEach(word => {
+              const div = document.createElement('div');
+              div.className = 'ocr-result-item';
+              div.innerHTML = `${word}<span class="ocr-tag">Tap to use as model #</span>`;
+              div.addEventListener('click', () => {
+                const clean = word.replace(/[^A-Za-z0-9\-]/g, '');
+                modelInput.value = clean;
+                modelInput.dispatchEvent(new Event('input'));
+                document.getElementById('noteModel').value = clean;
+                showToast('Model number set: ' + clean);
+                ocrOverlay.classList.remove('visible');
+                cameraInput.value = '';
+              });
+              ocrResults.appendChild(div);
+            });
+          });
         } else {
           // Show each candidate as a tappable button
           ocrResults.innerHTML = '';
@@ -1330,46 +1355,56 @@ ${closingLine}`;
       // Split text into individual "words" (anything separated by whitespace or common delimiters)
       const tokens = rawText
         .replace(/[|\\\/\[\]{}()]/g, ' ')  // Replace common OCR artifacts
-        .split(/[\s,;:]+/)                   // Split on whitespace and punctuation
-        .map(t => t.trim().replace(/^[.-]+|[.-]+$/g, '')) // Clean leading/trailing dots/dashes
-        .filter(t => t.length >= 4);         // Must be at least 4 chars
+        .replace(/[oO]/g, (m) => m)        // Keep O's — OCR often confuses O and 0
+        .split(/[\s,;:]+/)                  // Split on whitespace and punctuation
+        .map(t => t.trim().replace(/^[.\-_]+|[.\-_]+$/g, '')) // Clean edges
+        .filter(t => t.length >= 3);        // Lowered to 3 chars minimum
+
+      // Common label words to skip — these appear on tags but aren't model/serial numbers
+      const skipWords = new Set(['MODEL', 'SERIAL', 'NUMBER', 'TYPE', 'STYLE', 'COLOR',
+        'MADE', 'USA', 'CHINA', 'MEXICO', 'DATE', 'MFG', 'PROD', 'RATING',
+        'VOLTS', 'AMPS', 'WATTS', 'HERTZ', 'PHASE', 'THIS', 'THE', 'FOR',
+        'WITH', 'FROM', 'LISTED', 'MANUFACTURED', 'PATENT', 'WARNING',
+        'CAUTION', 'DANGER', 'IMPORTANT', 'NOTE', 'SEE', 'USE', 'ONLY',
+        'NOT', 'AND', 'MAX', 'MIN', 'REF', 'CAT', 'UNIT']);
 
       tokens.forEach(token => {
-        const upper = token.toUpperCase();
+        // Clean up: remove non-alphanumeric except dashes
+        const cleaned = token.replace(/[^A-Za-z0-9\-]/g, '');
+        if (cleaned.length < 3) return;
+
+        const upper = cleaned.toUpperCase();
         if (seen.has(upper)) return;
-
-        // Skip common words that OCR might pick up
-        const skipWords = ['MODEL', 'SERIAL', 'NUMBER', 'TYPE', 'STYLE', 'COLOR',
-          'MADE', 'USA', 'CHINA', 'MEXICO', 'DATE', 'MFG', 'PROD', 'RATING',
-          'VOLTS', 'AMPS', 'WATTS', 'HERTZ', 'PHASE', 'THIS', 'THE', 'FOR',
-          'WITH', 'FROM', 'LISTED', '?"?"'];
-        if (skipWords.includes(upper)) return;
-
-        // Must contain at least one letter AND one number (model/serial pattern)
-        const hasLetter = /[A-Za-z]/.test(token);
-        const hasNumber = /[0-9]/.test(token);
-        if (!hasLetter || !hasNumber) return;
-
-        // Length check: model numbers are typically 6-20 chars
-        if (upper.length < 5 || upper.length > 25) return;
+        if (skipWords.has(upper)) return;
 
         seen.add(upper);
 
-        // Try to guess if it's a model or serial number
-        // Serial numbers tend to be longer and more numeric
+        // Categorize the token
+        const hasLetter = /[A-Za-z]/.test(cleaned);
+        const hasNumber = /[0-9]/.test(cleaned);
         const digitRatio = (upper.match(/[0-9]/g) || []).length / upper.length;
-        const tag = (upper.length > 14 || digitRatio > 0.7)
-          ? 'Likely serial'
-          : 'Likely model';
+
+        let tag;
+        if (hasLetter && hasNumber && upper.length >= 6) {
+          // Mixed alphanumeric, 6+ chars — strong model/serial candidate
+          tag = (upper.length > 14 || digitRatio > 0.7) ? 'Likely serial' : 'Likely model';
+        } else if (hasNumber && !hasLetter && upper.length >= 6) {
+          // All numeric, long — could be serial or part number
+          tag = 'Numeric code';
+        } else if (hasLetter && hasNumber) {
+          // Short mixed — might still be useful
+          tag = 'Short code';
+        } else {
+          // Pure text or pure short numbers — skip for the smart list
+          return;
+        }
 
         candidates.push({ text: upper, tag: tag });
       });
 
-      // Sort: likely models first, then serials
-      candidates.sort((a, b) => {
-        if (a.tag === b.tag) return 0;
-        return a.tag === 'Likely model' ? -1 : 1;
-      });
+      // Sort: likely models first, then serials, then others
+      const priority = { 'Likely model': 0, 'Likely serial': 1, 'Short code': 2, 'Numeric code': 3 };
+      candidates.sort((a, b) => (priority[a.tag] || 9) - (priority[b.tag] || 9));
 
       return candidates;
     }
