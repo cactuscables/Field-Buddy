@@ -1352,24 +1352,46 @@ ${closingLine}`;
       const candidates = [];
       const seen = new Set();
 
-      // Split text into individual "words" (anything separated by whitespace or common delimiters)
-      const tokens = rawText
-        .replace(/[|\\\/\[\]{}()]/g, ' ')  // Replace common OCR artifacts
-        .replace(/[oO]/g, (m) => m)        // Keep O's — OCR often confuses O and 0
-        .split(/[\s,;:]+/)                  // Split on whitespace and punctuation
-        .map(t => t.trim().replace(/^[.\-_]+|[.\-_]+$/g, '')) // Clean edges
-        .filter(t => t.length >= 3);        // Lowered to 3 chars minimum
+      // ---- STEP 1: Look for labeled values (MOD., MODEL, SER., SERIAL, etc.) ----
+      // These are high-confidence matches — the value right after a label keyword
+      const labelPatterns = [
+        // Model labels: MOD, MOD., MOD#, MODEL, MODEL., MODEL#, M/N, M:
+        { regex: /(?:MOD(?:EL)?\.?#?\s*[:.]?\s*|M\/N\s*[:.]?\s*)([A-Za-z0-9][\w\-\.]{3,})/gi, type: 'model' },
+        // Serial labels: SER, SER., SERIAL, SERIAL., S/N, S:
+        { regex: /(?:SER(?:IAL)?\.?#?\s*[:.]?\s*|S\/N\s*[:.]?\s*)([A-Za-z0-9][\w\-\.]{3,})/gi, type: 'serial' },
+      ];
 
-      // Common label words to skip — these appear on tags but aren't model/serial numbers
+      labelPatterns.forEach(({ regex, type }) => {
+        let match;
+        while ((match = regex.exec(rawText)) !== null) {
+          const value = match[1].replace(/[^A-Za-z0-9\-]/g, '').toUpperCase();
+          if (value.length >= 4 && !seen.has(value)) {
+            seen.add(value);
+            candidates.push({
+              text: value,
+              tag: type === 'model' ? 'Model (from label)' : 'Serial (from label)'
+            });
+          }
+        }
+      });
+
+      // ---- STEP 2: Find other alphanumeric codes that look like model/serial ----
+      const cleanedText = rawText.replace(/[|\\\/\[\]{}()]/g, ' ');
+      const tokens = cleanedText
+        .split(/[\s,;:]+/)
+        .map(t => t.trim().replace(/^[.\-_]+|[.\-_]+$/g, ''))
+        .filter(t => t.length >= 3);
+
+      // Words to skip — common label text on appliance tags
       const skipWords = new Set(['MODEL', 'SERIAL', 'NUMBER', 'TYPE', 'STYLE', 'COLOR',
         'MADE', 'USA', 'CHINA', 'MEXICO', 'DATE', 'MFG', 'PROD', 'RATING',
         'VOLTS', 'AMPS', 'WATTS', 'HERTZ', 'PHASE', 'THIS', 'THE', 'FOR',
         'WITH', 'FROM', 'LISTED', 'MANUFACTURED', 'PATENT', 'WARNING',
         'CAUTION', 'DANGER', 'IMPORTANT', 'NOTE', 'SEE', 'USE', 'ONLY',
-        'NOT', 'AND', 'MAX', 'MIN', 'REF', 'CAT', 'UNIT']);
+        'NOT', 'AND', 'MAX', 'MIN', 'REF', 'CAT', 'UNIT', 'MOD', 'SER',
+        '?"?"', 'CORP', 'CORPORATION', 'INC']);
 
       tokens.forEach(token => {
-        // Clean up: remove non-alphanumeric except dashes
         const cleaned = token.replace(/[^A-Za-z0-9\-]/g, '');
         if (cleaned.length < 3) return;
 
@@ -1379,31 +1401,33 @@ ${closingLine}`;
 
         seen.add(upper);
 
-        // Categorize the token
         const hasLetter = /[A-Za-z]/.test(cleaned);
         const hasNumber = /[0-9]/.test(cleaned);
         const digitRatio = (upper.match(/[0-9]/g) || []).length / upper.length;
 
         let tag;
         if (hasLetter && hasNumber && upper.length >= 6) {
-          // Mixed alphanumeric, 6+ chars — strong model/serial candidate
           tag = (upper.length > 14 || digitRatio > 0.7) ? 'Likely serial' : 'Likely model';
         } else if (hasNumber && !hasLetter && upper.length >= 6) {
-          // All numeric, long — could be serial or part number
           tag = 'Numeric code';
         } else if (hasLetter && hasNumber) {
-          // Short mixed — might still be useful
           tag = 'Short code';
         } else {
-          // Pure text or pure short numbers — skip for the smart list
           return;
         }
 
         candidates.push({ text: upper, tag: tag });
       });
 
-      // Sort: likely models first, then serials, then others
-      const priority = { 'Likely model': 0, 'Likely serial': 1, 'Short code': 2, 'Numeric code': 3 };
+      // Sort: labeled matches first, then likely model, serial, then others
+      const priority = {
+        'Model (from label)': 0,
+        'Serial (from label)': 1,
+        'Likely model': 2,
+        'Likely serial': 3,
+        'Short code': 4,
+        'Numeric code': 5
+      };
       candidates.sort((a, b) => (priority[a.tag] || 9) - (priority[b.tag] || 9));
 
       return candidates;
