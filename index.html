@@ -998,37 +998,37 @@ ${closingLine}`;
     }
 
     // ============================================================
-    // CLIPBOARD — Works on HTTP, iOS Safari, and older browsers
-    // The modern Clipboard API needs HTTPS, so we use the older
-    // execCommand approach with iOS-specific workarounds.
+    // CLIPBOARD — Uses execCommand as primary method since it
+    // works on HTTP, Firefox, and iOS Safari. The modern
+    // Clipboard API is HTTPS-only and has permission quirks.
     // ============================================================
 
     function copyToClipboard(text) {
-      // Try modern API first (works on HTTPS / localhost)
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text);
-        return true;
-      }
-
-      // Fallback: create a temporary textarea and use execCommand
+      // Always use the execCommand approach — it's the most reliable
+      // across browsers, HTTP/HTTPS, and mobile
       const textarea = document.createElement('textarea');
       textarea.value = text;
 
-      // Prevent iOS zoom and keep it off-screen
+      // 16px font prevents iOS from zooming when focusing
       textarea.style.fontSize = '16px';
+      // Position it on-screen but invisible (off-screen elements
+      // can fail on some mobile browsers)
       textarea.style.position = 'fixed';
       textarea.style.left = '0';
       textarea.style.top = '0';
-      textarea.style.opacity = '0';
+      textarea.style.width = '1px';
+      textarea.style.height = '1px';
+      textarea.style.opacity = '0.01';
+      textarea.style.zIndex = '-1';
 
-      // iOS Safari needs these attributes
+      // iOS Safari workarounds
       textarea.setAttribute('readonly', '');
       textarea.setAttribute('contenteditable', 'true');
 
       document.body.appendChild(textarea);
 
-      // iOS-specific selection method
-      if (navigator.userAgent.match(/ipad|iphone/i)) {
+      // Select the text — different methods for iOS vs everything else
+      if (/ipad|iphone/i.test(navigator.userAgent)) {
         const range = document.createRange();
         range.selectNodeContents(textarea);
         const selection = window.getSelection();
@@ -1036,7 +1036,9 @@ ${closingLine}`;
         selection.addRange(range);
         textarea.setSelectionRange(0, text.length);
       } else {
+        textarea.focus();
         textarea.select();
+        textarea.setSelectionRange(0, text.length);
       }
 
       let success = false;
@@ -1047,6 +1049,13 @@ ${closingLine}`;
       }
 
       document.body.removeChild(textarea);
+
+      // If execCommand failed, try modern API as last resort
+      if (!success && navigator.clipboard) {
+        navigator.clipboard.writeText(text).catch(() => {});
+        success = true; // optimistic — can't know for sure
+      }
+
       return success;
     }
 
