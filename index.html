@@ -681,7 +681,7 @@
 
     <label>Status</label>
     <div class="toggle-group">
-      <button class="toggle-btn active" data-status="aa">AA (Awaiting Approval)</button>
+      <button class="toggle-btn active" data-status="aa">Aa (Awaiting Approval)</button>
       <button class="toggle-btn" data-status="date">Approved (Date)</button>
     </div>
     <!-- Date picker, shown only when "Approved" is selected -->
@@ -689,6 +689,13 @@
       <input type="date" id="partDate" style="width:100%; padding:12px 14px; background:#0f3460;
         border:1px solid #1a4a7a; border-radius:8px; color:#e0e0e0; font-size:16px;">
     </div>
+
+    <!-- Warranty toggle — highlights row yellow in the sheet -->
+    <label style="margin-top:16px; display:flex; align-items:center; gap:10px; cursor:pointer;
+      text-transform:none; font-size:14px; color:#e0e0e0; letter-spacing:0;">
+      <input type="checkbox" id="partWarranty" style="width:20px; height:20px; accent-color:#e94560;">
+      Warranty (highlight row yellow)
+    </label>
 
     <label>Preview (Column C format)</label>
     <div class="note-preview" id="partPreview" style="min-height:40px;"></div>
@@ -1633,10 +1640,10 @@ ${closingLine}`;
     }
     updatePartPreview();
 
-    // Get the status value (date string or "AA")
+    // Get the status value (date string or "Aa")
     function getPartStatusValue() {
-      if (partStatus === 'aa') return 'AA';
-      return document.getElementById('partDate').value || 'AA';
+      if (partStatus === 'aa') return 'Aa';
+      return document.getElementById('partDate').value || 'Aa';
     }
 
     // Send to Google Sheet
@@ -1656,6 +1663,8 @@ ${closingLine}`;
       const colC = partDesc
         ? `***P# ${partNum}*** **${partDesc}**`
         : `***P# ${partNum}***`;
+
+      const highlight = document.getElementById('partWarranty').checked;
 
       // Check if Google Sheets URL is configured
       if (!SHEETS_SCRIPT_URL) {
@@ -1684,15 +1693,16 @@ ${closingLine}`;
             customer: customer,
             invoice: invoice,
             partInfo: colC,
-            status: status
+            status: status,
+            highlight: highlight
           })
         });
 
         // no-cors means we can't read the response, but if it didn't throw, it sent
-        showToast('Sent to Google Sheet!');
+        showToast(highlight ? 'Sent (warranty — yellow)!' : 'Sent to Google Sheet!');
 
         // Log it locally
-        saveToPartsLog(customer, invoice, colC, status);
+        saveToPartsLog(customer, invoice, colC, status, highlight);
 
         // Clear part fields (keep customer & invoice for multi-part orders)
         document.getElementById('partNumber').value = '';
@@ -1728,14 +1738,15 @@ ${closingLine}`;
         b.classList.toggle('active', b.dataset.status === 'aa');
       });
       document.getElementById('partDateRow').style.display = 'none';
+      document.getElementById('partWarranty').checked = false;
       updatePartPreview();
     });
 
     // Parts log — saved locally for reference
-    function saveToPartsLog(customer, invoice, partInfo, status) {
+    function saveToPartsLog(customer, invoice, partInfo, status, highlight) {
       const log = JSON.parse(localStorage.getItem('fb_parts_log') || '[]');
       log.unshift({
-        customer, invoice, partInfo, status,
+        customer, invoice, partInfo, status, highlight,
         date: new Date().toLocaleString()
       });
       localStorage.setItem('fb_parts_log', JSON.stringify(log.slice(0, 200)));
@@ -1756,7 +1767,7 @@ ${closingLine}`;
         const div = document.createElement('div');
         div.className = 'saved-note-item';
         div.innerHTML = `
-          <div class="saved-note-title">${item.customer}</div>
+          <div class="saved-note-title">${item.highlight ? '🟡 ' : ''}${item.customer}</div>
           <div class="saved-note-meta">
             Inv: ${item.invoice || '—'} | ${item.partInfo} | ${item.status} | ${item.date}
           </div>
