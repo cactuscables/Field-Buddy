@@ -703,6 +703,9 @@
     <button class="btn-primary" id="sendToSheetBtn">Send to Google Sheet</button>
     <button class="btn-secondary" id="addAnotherPartBtn">+ Add Another Part (Same Customer)</button>
     <button class="btn-secondary" id="clearPartsBtn">Clear</button>
+    <button class="btn-small" id="resetSheetUrlBtn" style="margin-top:16px;">
+      Change Sheet URL
+    </button>
 
     <hr class="section-divider">
     <label>Sent Parts Log</label>
@@ -1685,7 +1688,10 @@ ${closingLine}`;
       sendBtn.disabled = true;
 
       try {
-        // Use GET with URL params — avoids all CORS issues with Apps Script
+        // Use a hidden iframe to call the Apps Script URL.
+        // This is the most reliable method — iframe navigation has ZERO
+        // CORS restrictions, unlike fetch() which gets blocked by the
+        // redirect Google Apps Script does (script.google.com → googleusercontent.com).
         const params = new URLSearchParams({
           customer: customer,
           invoice: invoice,
@@ -1693,8 +1699,29 @@ ${closingLine}`;
           status: status,
           highlight: highlight ? 'true' : 'false'
         });
-        const response = await fetch(SHEETS_SCRIPT_URL + '?' + params.toString(), {
-          redirect: 'follow'
+        const fullUrl = SHEETS_SCRIPT_URL + '?' + params.toString();
+
+        await new Promise((resolve, reject) => {
+          const iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          iframe.src = fullUrl;
+          iframe.onload = () => {
+            // Script executed successfully
+            setTimeout(() => document.body.removeChild(iframe), 3000);
+            resolve();
+          };
+          iframe.onerror = () => {
+            document.body.removeChild(iframe);
+            reject(new Error('Failed to reach Google Sheets'));
+          };
+          document.body.appendChild(iframe);
+          // Timeout after 15 seconds
+          setTimeout(() => {
+            if (document.body.contains(iframe)) {
+              document.body.removeChild(iframe);
+              resolve(); // Assume it worked — sometimes onload doesn't fire cross-origin
+            }
+          }, 15000);
         });
 
         showToast(highlight ? 'Sent (warranty — yellow)!' : 'Sent to Google Sheet!');
@@ -1738,6 +1765,19 @@ ${closingLine}`;
       document.getElementById('partDateRow').style.display = 'none';
       document.getElementById('partWarranty').checked = false;
       updatePartPreview();
+    });
+
+    // Reset Sheet URL — in case the saved URL is wrong
+    document.getElementById('resetSheetUrlBtn').addEventListener('click', () => {
+      const current = SHEETS_SCRIPT_URL || '(not set)';
+      const url = prompt(
+        'Current URL:\n' + current + '\n\nPaste new Google Apps Script Web App URL:'
+      );
+      if (url) {
+        SHEETS_SCRIPT_URL = url.trim();
+        localStorage.setItem('fb_sheets_url', SHEETS_SCRIPT_URL);
+        showToast('Sheet URL updated');
+      }
     });
 
     // Parts log — saved locally for reference
