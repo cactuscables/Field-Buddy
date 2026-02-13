@@ -1,6 +1,6 @@
 {
-  "name": "Field Buddy",
-  "short_name": "FieldBuddy",
+  "name": "Tech Portal",
+  "short_name": "TechPortal",
   "description": "Appliance repair parts lookup and workorder notes",
   "start_url": "/",
   "display": "standalone",

@@ -1,7 +1,7 @@
-// Service Worker for Field Buddy PWA
+// Service Worker for Tech Portal PWA
 // This file makes the app work offline by caching resources
 
-const CACHE_NAME = 'field-buddy-v1';
+const CACHE_NAME = 'tech-portal-v2';
 
 // Files to cache for offline use
 const ASSETS_TO_CACHE = [
