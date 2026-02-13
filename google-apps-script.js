@@ -47,9 +47,16 @@ function doGet(e) {
     var sheet = SpreadsheetApp.getActiveSpreadsheet()
                   .getSheetByName('Parts to be ordered');
 
-    // Find the first empty row (after the header row)
-    var lastRow = sheet.getLastRow();
-    var newRow = lastRow + 1;
+    // Find the first empty row in column A (skips header row 1)
+    // Scans column A to find the first blank cell, so gaps get filled
+    var colA = sheet.getRange('A2:A').getValues(); // start at row 2 (skip header)
+    var newRow = colA.length + 2; // default: after all rows
+    for (var i = 0; i < colA.length; i++) {
+      if (colA[i][0] === '' || colA[i][0] === null) {
+        newRow = i + 2; // +2 because array is 0-indexed and we started at row 2
+        break;
+      }
+    }
 
     // Write data to columns A-D
     // A: Customer Name
