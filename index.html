@@ -1238,23 +1238,35 @@ ${closingLine}`;
       return new Promise((resolve) => {
         const img = new Image();
         img.onload = () => {
+          // ---- Downscale large images ----
+          // iPhone photos are 4000+ px. Huge images are SLOWER and LESS
+          // accurate for OCR — Tesseract works best around 1000-1500px.
+          const MAX_DIM = 1500;
+          let w = img.width;
+          let h = img.height;
+          if (Math.max(w, h) > MAX_DIM) {
+            const scale = MAX_DIM / Math.max(w, h);
+            w = Math.round(w * scale);
+            h = Math.round(h * scale);
+          }
+
           const canvas = document.createElement('canvas');
 
           // If rotating 90 or 270, swap width/height
           if (rotationDeg === 90 || rotationDeg === 270) {
-            canvas.width = img.height;
-            canvas.height = img.width;
+            canvas.width = h;
+            canvas.height = w;
           } else {
-            canvas.width = img.width;
-            canvas.height = img.height;
+            canvas.width = w;
+            canvas.height = h;
           }
           const ctx = canvas.getContext('2d');
 
-          // Apply rotation around center
+          // Apply rotation around center, draw scaled image
           ctx.save();
           ctx.translate(canvas.width / 2, canvas.height / 2);
           ctx.rotate((rotationDeg * Math.PI) / 180);
-          ctx.drawImage(img, -img.width / 2, -img.height / 2);
+          ctx.drawImage(img, -w / 2, -h / 2, w, h);
           ctx.restore();
 
           // Get pixel data and convert to high-contrast B&W
@@ -1264,11 +1276,11 @@ ${closingLine}`;
           for (let i = 0; i < data.length; i += 4) {
             // Grayscale using luminance formula
             let gray = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-            // Contrast boost (slightly less aggressive)
+            // Contrast boost
             gray = ((gray / 255 - 0.5) * 1.5 + 0.5) * 255;
             gray = Math.max(0, Math.min(255, gray));
-            // Threshold to pure B&W (lowered threshold to keep more detail)
-            gray = gray > 120 ? 255 : 0;
+            // Threshold to pure B&W
+            gray = gray > 128 ? 255 : 0;
             data[i] = gray;
             data[i+1] = gray;
             data[i+2] = gray;
@@ -1444,10 +1456,14 @@ ${closingLine}`;
       // High-confidence matches — the value right after a label keyword.
       // Covers many formats: MOD., Model:, M/N, Service no., ART. NO., SERIAL NO., etc.
       const labelPatterns = [
-        // Model labels: MOD, MOD., MOD#, MODEL, MODEL:, M/N
-        { regex: /(?:MOD(?:EL)?\.?#?\s*[:.]?\s*|M\/N\s*[:.]?\s*)([A-Za-z0-9][\w\-\.]{3,})/gi, type: 'model' },
-        // Serial labels: SER, SER., SERIAL, SERIAL NO., S/N
-        { regex: /(?:SER(?:IAL)?\.?\s*(?:NO\.?)?\s*[:.]?\s*|S\/N\s*[:.]?\s*)([A-Za-z0-9][\w\-\.]{3,})/gi, type: 'serial' },
+        // Model labels: MODEL NUMBER, MODEL NO., MODEL NO:, MODEL#, MODEL:, MOD., M/N
+        // The (?:NUMBER|NO\.?|#) group is key — without it, "MODEL NUMBER" would
+        // capture "NUMBER" as the value instead of the actual model number after it
+        { regex: /(?:MOD(?:EL)?\.?\s*(?:NUMBER|NO\.?|#)?\s*[:.]?\s*|M\/N\s*[:.]?\s*)([A-Za-z0-9][\w\-\.]{3,})/gi, type: 'model' },
+        // Serial labels: SERIAL NUMBER, SERIAL NO., SER., S/N
+        { regex: /(?:SER(?:IAL)?\.?\s*(?:NUMBER|NO\.?|#)?\s*[:.]?\s*|S\/N\s*[:.]?\s*)([A-Za-z0-9][\w\-\.]{3,})/gi, type: 'serial' },
+        // Stock number (Whirlpool uses this)
+        { regex: /(?:STOCK\s*(?:NUMBER|NO\.?|#)?\s*[:.]?\s*)([A-Za-z0-9][\w\-\.]{3,})/gi, type: 'model' },
         // Service no. / Service number (Miele, Bosch, European brands)
         { regex: /(?:SERVICE\s*(?:NO\.?|NUMBER|#)\s*[:.]?\s*)([A-Za-z0-9][\w\-\.]{3,})/gi, type: 'model' },
         // ART. NO. / Article Number / Art. Nr. (European brands)
@@ -1480,13 +1496,18 @@ ${closingLine}`;
         .filter(t => t.length >= 3);
 
       // Words to skip — common label text on appliance tags
-      const skipWords = new Set(['MODEL', 'SERIAL', 'NUMBER', 'TYPE', 'STYLE', 'COLOR',
-        'MADE', 'USA', 'CHINA', 'MEXICO', 'DATE', 'MFG', 'PROD', 'RATING',
-        'VOLTS', 'AMPS', 'WATTS', 'HERTZ', 'PHASE', 'THIS', 'THE', 'FOR',
-        'WITH', 'FROM', 'LISTED', 'MANUFACTURED', 'PATENT', 'WARNING',
-        'CAUTION', 'DANGER', 'IMPORTANT', 'NOTE', 'SEE', 'USE', 'ONLY',
-        'NOT', 'AND', 'MAX', 'MIN', 'REF', 'CAT', 'UNIT', 'MOD', 'SER',
-        '?"?"', 'CORP', 'CORPORATION', 'INC']);
+      const skipWords = new Set(['MODEL', 'SERIAL', 'NUMBER', 'STOCK', 'TYPE',
+        'STYLE', 'COLOR', 'SIZE', 'BRAND', 'MOTOR', 'HEATER', 'TOTAL',
+        'MADE', 'USA', 'CHINA', 'MEXICO', 'KOREA', 'DATE', 'MFG', 'PROD',
+        'RATING', 'VOLTS', 'AMPS', 'WATTS', 'HERTZ', 'PHASE', 'CYCLE',
+        'THIS', 'THE', 'FOR', 'WITH', 'FROM', 'LISTED', 'MANUFACTURED',
+        'PATENT', 'WARNING', 'CAUTION', 'DANGER', 'IMPORTANT', 'NOTE',
+        'SEE', 'USE', 'ONLY', 'NOT', 'AND', 'MAX', 'MIN', 'REF', 'CAT',
+        'UNIT', 'MOD', 'SER', 'CORP', 'CORPORATION', 'INC', 'WHIRLPOOL',
+        'SAMSUNG', 'FRIGIDAIRE', 'ELECTROLUX', 'BOSCH', 'THERMADOR',
+        'MAYTAG', 'KITCHENAID', 'AMANA', 'VIKING', 'MIELE', 'TEST',
+        'PRESSURES', 'BENTON', 'HARBOR', 'MICHIGAN', 'SERVICE',
+        'MARCA', 'REGISTRADA', 'ARTICLE']);
 
       tokens.forEach(token => {
         const cleaned = token.replace(/[^A-Za-z0-9\-]/g, '');
