@@ -583,6 +583,7 @@
   <div class="tab-bar">
     <button class="tab-btn active" data-tab="lookup">Lookup</button>
     <button class="tab-btn" data-tab="notes">Notes</button>
+    <button class="tab-btn" data-tab="parts">Parts</button>
     <button class="tab-btn" data-tab="history">History</button>
   </div>
 
@@ -660,6 +661,45 @@
     <hr class="section-divider">
     <label>Saved Notes</label>
     <div id="savedNotesList"></div>
+  </div>
+
+  <!-- ==================== PARTS TAB ==================== -->
+  <div id="parts" class="tab-content">
+    <label for="partCustomer">Customer Name</label>
+    <input type="text" id="partCustomer" placeholder="e.g. Smith, John">
+
+    <label for="partInvoice">Invoice #</label>
+    <input type="text" id="partInvoice" placeholder="e.g. 12345"
+           autocomplete="off" spellcheck="false">
+
+    <label for="partNumber">Part Number</label>
+    <input type="text" id="partNumber" placeholder="e.g. W11396618"
+           autocapitalize="characters" autocomplete="off" spellcheck="false">
+
+    <label for="partDesc">Part Description</label>
+    <input type="text" id="partDesc" placeholder="e.g. Control Board, Thermal Fuse">
+
+    <label>Status</label>
+    <div class="toggle-group">
+      <button class="toggle-btn active" data-status="aa">AA (Awaiting Approval)</button>
+      <button class="toggle-btn" data-status="date">Approved (Date)</button>
+    </div>
+    <!-- Date picker, shown only when "Approved" is selected -->
+    <div id="partDateRow" style="display:none; margin-top:8px;">
+      <input type="date" id="partDate" style="width:100%; padding:12px 14px; background:#0f3460;
+        border:1px solid #1a4a7a; border-radius:8px; color:#e0e0e0; font-size:16px;">
+    </div>
+
+    <label>Preview (Column C format)</label>
+    <div class="note-preview" id="partPreview" style="min-height:40px;"></div>
+
+    <button class="btn-primary" id="sendToSheetBtn">Send to Google Sheet</button>
+    <button class="btn-secondary" id="addAnotherPartBtn">+ Add Another Part (Same Customer)</button>
+    <button class="btn-secondary" id="clearPartsBtn">Clear</button>
+
+    <hr class="section-divider">
+    <label>Sent Parts Log</label>
+    <div id="partsLog"></div>
   </div>
 
   <!-- ==================== HISTORY TAB ==================== -->
@@ -1553,12 +1593,186 @@ ${closingLine}`;
     }
 
     // ============================================================
+    // PARTS TAB — Send part orders to Google Sheets
+    // ============================================================
+
+    // Google Apps Script Web App URL — set this after deploying the script
+    // (see instructions in the repo README or braindump notes)
+    let SHEETS_SCRIPT_URL = localStorage.getItem('fb_sheets_url') || '';
+
+    let partStatus = 'aa'; // 'aa' or 'date'
+
+    // Status toggle (AA vs Approved Date)
+    document.querySelectorAll('[data-status]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-status]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        partStatus = btn.dataset.status;
+        // Show/hide date picker
+        document.getElementById('partDateRow').style.display =
+          partStatus === 'date' ? 'block' : 'none';
+        updatePartPreview();
+      });
+    });
+
+    // Set default date to today
+    document.getElementById('partDate').valueAsDate = new Date();
+
+    // Update preview as fields change
+    ['partNumber', 'partDesc'].forEach(id => {
+      document.getElementById(id).addEventListener('input', updatePartPreview);
+    });
+    document.getElementById('partDate').addEventListener('change', updatePartPreview);
+
+    // Build the Column C preview: ***P# [number]*** **[description]**
+    function updatePartPreview() {
+      const num = document.getElementById('partNumber').value || '(part #)';
+      const desc = document.getElementById('partDesc').value || '(description)';
+      document.getElementById('partPreview').textContent =
+        `***P# ${num}*** **${desc}**`;
+    }
+    updatePartPreview();
+
+    // Get the status value (date string or "AA")
+    function getPartStatusValue() {
+      if (partStatus === 'aa') return 'AA';
+      return document.getElementById('partDate').value || 'AA';
+    }
+
+    // Send to Google Sheet
+    document.getElementById('sendToSheetBtn').addEventListener('click', async () => {
+      const customer = document.getElementById('partCustomer').value.trim();
+      const invoice = document.getElementById('partInvoice').value.trim();
+      const partNum = document.getElementById('partNumber').value.trim();
+      const partDesc = document.getElementById('partDesc').value.trim();
+      const status = getPartStatusValue();
+
+      if (!customer || !partNum) {
+        showToast('Need at least customer name and part #');
+        return;
+      }
+
+      // Format Column C: ***P# [number]*** **[description]**
+      const colC = partDesc
+        ? `***P# ${partNum}*** **${partDesc}**`
+        : `***P# ${partNum}***`;
+
+      // Check if Google Sheets URL is configured
+      if (!SHEETS_SCRIPT_URL) {
+        // Prompt for the script URL on first use
+        const url = prompt(
+          'Paste your Google Apps Script Web App URL.\n\n' +
+          '(You only need to do this once — it will be saved.)\n\n' +
+          'See setup instructions in the Parts tab.'
+        );
+        if (!url) return;
+        SHEETS_SCRIPT_URL = url.trim();
+        localStorage.setItem('fb_sheets_url', SHEETS_SCRIPT_URL);
+      }
+
+      // Send data to Google Apps Script
+      const sendBtn = document.getElementById('sendToSheetBtn');
+      sendBtn.textContent = 'Sending...';
+      sendBtn.disabled = true;
+
+      try {
+        const response = await fetch(SHEETS_SCRIPT_URL, {
+          method: 'POST',
+          mode: 'no-cors', // Apps Script doesn't support CORS preflight
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer: customer,
+            invoice: invoice,
+            partInfo: colC,
+            status: status
+          })
+        });
+
+        // no-cors means we can't read the response, but if it didn't throw, it sent
+        showToast('Sent to Google Sheet!');
+
+        // Log it locally
+        saveToPartsLog(customer, invoice, colC, status);
+
+        // Clear part fields (keep customer & invoice for multi-part orders)
+        document.getElementById('partNumber').value = '';
+        document.getElementById('partDesc').value = '';
+        updatePartPreview();
+
+      } catch (err) {
+        showToast('Failed to send — check connection');
+        console.error('Sheet send error:', err);
+      }
+
+      sendBtn.textContent = 'Send to Google Sheet';
+      sendBtn.disabled = false;
+    });
+
+    // "Add Another Part" — clears part fields but keeps customer/invoice
+    document.getElementById('addAnotherPartBtn').addEventListener('click', () => {
+      document.getElementById('partNumber').value = '';
+      document.getElementById('partDesc').value = '';
+      updatePartPreview();
+      document.getElementById('partNumber').focus();
+      showToast('Add next part for same customer');
+    });
+
+    // Clear all parts fields
+    document.getElementById('clearPartsBtn').addEventListener('click', () => {
+      document.getElementById('partCustomer').value = '';
+      document.getElementById('partInvoice').value = '';
+      document.getElementById('partNumber').value = '';
+      document.getElementById('partDesc').value = '';
+      partStatus = 'aa';
+      document.querySelectorAll('[data-status]').forEach(b => {
+        b.classList.toggle('active', b.dataset.status === 'aa');
+      });
+      document.getElementById('partDateRow').style.display = 'none';
+      updatePartPreview();
+    });
+
+    // Parts log — saved locally for reference
+    function saveToPartsLog(customer, invoice, partInfo, status) {
+      const log = JSON.parse(localStorage.getItem('fb_parts_log') || '[]');
+      log.unshift({
+        customer, invoice, partInfo, status,
+        date: new Date().toLocaleString()
+      });
+      localStorage.setItem('fb_parts_log', JSON.stringify(log.slice(0, 200)));
+      renderPartsLog();
+    }
+
+    function renderPartsLog() {
+      const log = JSON.parse(localStorage.getItem('fb_parts_log') || '[]');
+      const list = document.getElementById('partsLog');
+
+      if (log.length === 0) {
+        list.innerHTML = '<div class="empty-state">No parts sent yet</div>';
+        return;
+      }
+
+      list.innerHTML = '';
+      log.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'saved-note-item';
+        div.innerHTML = `
+          <div class="saved-note-title">${item.customer}</div>
+          <div class="saved-note-meta">
+            Inv: ${item.invoice || '—'} | ${item.partInfo} | ${item.status} | ${item.date}
+          </div>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    // ============================================================
     // INITIALIZATION
     // ============================================================
 
-    // Render history and saved notes on load
+    // Render history, saved notes, and parts log on load
     renderHistory();
     renderSavedNotes();
+    renderPartsLog();
 
     // Register service worker for offline support
     if ('serviceWorker' in navigator) {
