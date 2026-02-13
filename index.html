@@ -1685,20 +1685,18 @@ ${closingLine}`;
       sendBtn.disabled = true;
 
       try {
-        const response = await fetch(SHEETS_SCRIPT_URL, {
-          method: 'POST',
-          mode: 'no-cors', // Apps Script doesn't support CORS preflight
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            customer: customer,
-            invoice: invoice,
-            partInfo: colC,
-            status: status,
-            highlight: highlight
-          })
+        // Use GET with URL params — avoids all CORS issues with Apps Script
+        const params = new URLSearchParams({
+          customer: customer,
+          invoice: invoice,
+          partInfo: colC,
+          status: status,
+          highlight: highlight ? 'true' : 'false'
+        });
+        const response = await fetch(SHEETS_SCRIPT_URL + '?' + params.toString(), {
+          redirect: 'follow'
         });
 
-        // no-cors means we can't read the response, but if it didn't throw, it sent
         showToast(highlight ? 'Sent (warranty — yellow)!' : 'Sent to Google Sheet!');
 
         // Log it locally
