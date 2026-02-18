@@ -60,7 +60,7 @@ GitHub Pages serves from `main` branch automatically. Changes are live in ~60 se
 
 ## Google Sheets Integration
 - **Backend:** `google-apps-script.js` — deployed as Google Apps Script Web App
-- **Sheet name:** "Parts to be ordered" (hard-coded in script)
+- **Sheet name:** "Parts to be ordered" tab within the "Dustin's Parts" spreadsheet (hard-coded in script)
 - **Columns:** A=Customer, B=Invoice#, C=Part Info, D=Status
 - **Row logic:** Scans column A for first empty row (fills gaps)
 - **Auth:** Script URL stored in browser localStorage (user enters once)

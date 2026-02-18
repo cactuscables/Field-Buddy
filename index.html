@@ -706,6 +706,9 @@
     <button class="btn-small" id="resetSheetUrlBtn" style="margin-top:16px;">
       Change Sheet URL
     </button>
+    <button class="btn-small" id="testSheetBtn" style="margin-top:8px;">
+      Test Sheet Connection
+    </button>
 
     <hr class="section-divider">
     <label>Sent Parts Log</label>
@@ -1701,25 +1704,47 @@ ${closingLine}`;
         });
         const fullUrl = SHEETS_SCRIPT_URL + '?' + params.toString();
 
+        // JSONP: inject a <script> tag that calls our callback with the real response.
+        // Unlike the old iframe approach, this lets us read success/error from Apps Script.
         await new Promise((resolve, reject) => {
-          const iframe = document.createElement('iframe');
-          iframe.style.display = 'none';
-          iframe.src = fullUrl;
-          iframe.onload = () => {
-            // Script executed successfully
-            setTimeout(() => document.body.removeChild(iframe), 3000);
-            resolve();
+          const cbName = '_sheetCb_' + Date.now();
+          const script = document.createElement('script');
+
+          // Cleanup helper — removes script tag and global callback
+          const cleanup = () => {
+            delete window[cbName];
+            if (script.parentNode) script.parentNode.removeChild(script);
           };
-          iframe.onerror = () => {
-            document.body.removeChild(iframe);
-            reject(new Error('Failed to reach Google Sheets'));
+
+          // Apps Script calls this function with the JSON response
+          window[cbName] = (data) => {
+            cleanup();
+            if (data && data.status === 'ok') {
+              // Debug: log where data went (remove after confirming fix)
+              if (data.sheetName) {
+                console.log('Sheet debug:', data);
+                alert('Wrote to row ' + data.row + ' in "' + data.tabName + '" tab of "' + data.sheetName + '"\n\n' + data.sheetUrl);
+              }
+              resolve();
+            } else {
+              reject(new Error(data && data.message ? data.message : 'Unknown error from Google Sheets'));
+            }
           };
-          document.body.appendChild(iframe);
-          // Timeout after 15 seconds
+
+          // Network failure fires onerror (unlike iframe which fires onload for everything)
+          script.onerror = () => {
+            cleanup();
+            reject(new Error('Could not reach Google Sheets'));
+          };
+
+          script.src = fullUrl + '&callback=' + cbName;
+          document.body.appendChild(script);
+
+          // Timeout after 15 seconds — now rejects instead of silently succeeding
           setTimeout(() => {
-            if (document.body.contains(iframe)) {
-              document.body.removeChild(iframe);
-              resolve(); // Assume it worked — sometimes onload doesn't fire cross-origin
+            if (window[cbName]) {
+              cleanup();
+              reject(new Error('Google Sheets request timed out'));
             }
           }, 15000);
         });
@@ -1735,7 +1760,7 @@ ${closingLine}`;
         updatePartPreview();
 
       } catch (err) {
-        showToast('Failed to send — check connection');
+        showToast('Failed: ' + err.message);
         console.error('Sheet send error:', err);
       }
 
@@ -1778,6 +1803,51 @@ ${closingLine}`;
         localStorage.setItem('fb_sheets_url', SHEETS_SCRIPT_URL);
         showToast('Sheet URL updated');
       }
+    });
+
+    // Test Sheet Connection — sends a no-data JSONP ping to verify the URL works
+    document.getElementById('testSheetBtn').addEventListener('click', () => {
+      if (!SHEETS_SCRIPT_URL) {
+        showToast('No Sheet URL set — click "Change Sheet URL" first');
+        return;
+      }
+      const testBtn = document.getElementById('testSheetBtn');
+      testBtn.textContent = 'Testing...';
+      testBtn.disabled = true;
+
+      const cbName = '_sheetTest_' + Date.now();
+      const script = document.createElement('script');
+      const cleanup = () => {
+        delete window[cbName];
+        if (script.parentNode) script.parentNode.removeChild(script);
+        testBtn.textContent = 'Test Sheet Connection';
+        testBtn.disabled = false;
+      };
+
+      window[cbName] = (data) => {
+        cleanup();
+        if (data && data.status === 'ok') {
+          showToast('Connection OK!');
+        } else {
+          showToast('Error: ' + (data && data.message ? data.message : 'Unknown'));
+        }
+      };
+
+      script.onerror = () => {
+        cleanup();
+        showToast('Failed — could not reach Google Sheets');
+      };
+
+      // Call with just the callback param (no customer = status check only)
+      script.src = SHEETS_SCRIPT_URL + '?callback=' + cbName;
+      document.body.appendChild(script);
+
+      setTimeout(() => {
+        if (window[cbName]) {
+          cleanup();
+          showToast('Timed out — check URL and try again');
+        }
+      }, 15000);
     });
 
     // Parts log — saved locally for reference

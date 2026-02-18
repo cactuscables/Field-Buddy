@@ -31,9 +31,13 @@ function doGet(e) {
   try {
     // If no parameters, just show a status message
     if (!e.parameter.customer) {
-      return ContentService.createTextOutput(
-        'Tech Portal sheet integration is running. Send data from the app.'
-      );
+      var statusMsg = 'Tech Portal sheet integration is running. Send data from the app.';
+      if (e.parameter.callback) {
+        var statusResult = JSON.stringify({ status: 'ok', message: statusMsg });
+        return ContentService.createTextOutput(e.parameter.callback + '(' + statusResult + ')')
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(statusMsg);
     }
 
     // Get data from URL parameters
@@ -73,14 +77,32 @@ function doGet(e) {
       sheet.getRange(newRow, 1, 1, 26).setBackground('#ffff00'); // A-Z yellow
     }
 
-    // Return success
-    return ContentService.createTextOutput(
-      JSON.stringify({ status: 'ok', row: newRow })
-    ).setMimeType(ContentService.MimeType.JSON);
+    // Return success — supports both JSON and JSONP responses
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var result = JSON.stringify({
+      status: 'ok',
+      row: newRow,
+      sheetName: ss.getName(),
+      sheetUrl: ss.getUrl(),
+      tabName: sheet.getName()
+    });
+    var callback = e.parameter.callback;
+    if (callback) {
+      // JSONP: wrap response so the browser can read it cross-origin
+      return ContentService.createTextOutput(callback + '(' + result + ')')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return ContentService.createTextOutput(result)
+      .setMimeType(ContentService.MimeType.JSON);
 
   } catch (error) {
-    return ContentService.createTextOutput(
-      JSON.stringify({ status: 'error', message: error.toString() })
-    ).setMimeType(ContentService.MimeType.JSON);
+    var errResult = JSON.stringify({ status: 'error', message: error.toString() });
+    var errCallback = e.parameter.callback;
+    if (errCallback) {
+      return ContentService.createTextOutput(errCallback + '(' + errResult + ')')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return ContentService.createTextOutput(errResult)
+      .setMimeType(ContentService.MimeType.JSON);
   }
 }
