@@ -1091,13 +1091,11 @@
         : `### **Install Labor Completed - ${today}**`;
 
       // Assemble the full note in Dustin's format
+      // Install Labor doesn't need M:/S: — already in the original service call note
+      const modelSerial = noteType === 'service' ? `\nM: ${model}\n\nS: ${serial}\n` : '';
       const note = `## ${title}
 ___
-
-M: ${model}
-
-S: ${serial}
-
+${modelSerial}
 ${bulletText}
 
 ${closingLine}`;
