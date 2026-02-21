@@ -569,6 +569,74 @@
       font-size: 14px;
       cursor: pointer;
     }
+
+    /* ========================================
+       STOCK TAB — Truck inventory table
+       ======================================== */
+    .stock-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    /* Search input stretches to fill available space */
+    .stock-controls input {
+      flex: 1;
+    }
+
+    .stock-last-updated {
+      font-size: 12px;
+      color: #8a8a9a;
+      margin-bottom: 12px;
+    }
+
+    .stock-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .stock-table th {
+      text-align: left;
+      padding: 8px 6px;
+      color: #8a8a9a;
+      border-bottom: 1px solid #0f3460;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stock-table td {
+      padding: 10px 6px;
+      border-bottom: 1px solid #0f3460;
+      vertical-align: top;
+    }
+
+    /* Part # column — monospace so numbers align */
+    .stock-table td:first-child {
+      font-family: monospace;
+      font-size: 13px;
+    }
+
+    /* Qty column — right-align, bold */
+    .stock-table td:last-child {
+      text-align: right;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    /* Red row — out of stock */
+    .stock-row-out td {
+      background: rgba(233, 69, 96, 0.15);
+      color: #e94560;
+    }
+
+    /* Yellow row — low stock (at or below min) */
+    .stock-row-low td {
+      background: rgba(255, 193, 7, 0.12);
+      color: #ffc107;
+    }
   </style>
 </head>
 
@@ -585,6 +653,7 @@
     <button class="tab-btn" data-tab="notes">Notes</button>
     <button class="tab-btn" data-tab="parts">Parts</button>
     <button class="tab-btn" data-tab="history">History</button>
+    <button class="tab-btn" data-tab="stock">Stock</button>
   </div>
 
   <!-- ==================== LOOKUP TAB ==================== -->
@@ -655,6 +724,7 @@
     <div class="note-preview" id="notePreview"></div>
 
     <button class="btn-primary" id="copyNoteBtn">Copy to Clipboard</button>
+    <button class="btn-secondary" id="copyOpenDispatchBtn">Copy &amp; Open Dispatch</button>
     <button class="btn-secondary" id="saveNoteBtn">Save Note</button>
     <button class="btn-secondary" id="clearNoteBtn">Clear</button>
 
@@ -720,6 +790,40 @@
     <label>Recent Lookups</label>
     <div id="historyList"></div>
     <button class="btn-secondary" id="clearHistoryBtn" style="margin-top:16px">Clear History</button>
+  </div>
+
+  <!-- ==================== STOCK TAB ==================== -->
+  <div id="stock" class="tab-content">
+    <!-- Search and refresh row -->
+    <div class="stock-controls">
+      <input type="text" id="stockSearch" placeholder="Search parts..." autocomplete="off" spellcheck="false">
+      <button class="btn-small" id="stockRefreshBtn">Refresh</button>
+    </div>
+    <div id="stockLastUpdated" class="stock-last-updated">Last updated: never</div>
+
+    <!-- Inventory table — populated by JS -->
+    <div id="stockTableWrap">
+      <table class="stock-table" id="stockTable">
+        <thead>
+          <tr>
+            <th>Part #</th>
+            <th>Description</th>
+            <th>Qty</th>
+          </tr>
+        </thead>
+        <tbody id="stockTableBody">
+          <!-- rows injected by JS -->
+        </tbody>
+      </table>
+      <div id="stockEmptyState" class="empty-state" style="display:none">
+        No stock data — tap Refresh to load
+      </div>
+    </div>
+
+    <!-- One-time setup button -->
+    <button class="btn-small" id="resetStockUrlBtn" style="margin-top:16px;">
+      Change Stock Sheet URL
+    </button>
   </div>
 
   <!-- OCR Processing Overlay -->
@@ -1117,6 +1221,19 @@ ${closingLine}`;
         showToast('Copied!');
       } else {
         showToast('Copy failed — long press the preview to select manually');
+      }
+    });
+
+    // Copy note + open Dispatch in a new tab so you can paste directly
+    document.getElementById('copyOpenDispatchBtn').addEventListener('click', async () => {
+      const text = notePreview.textContent;
+      const success = await copyToClipboard(text);
+      // Open dispatch.me — user navigates to their job and pastes
+      window.open('https://work.dispatch.me', '_blank');
+      if (success) {
+        showToast('Note copied \u2014 paste it in Dispatch');
+      } else {
+        showToast('Copy failed \u2014 long press the preview to copy manually');
       }
     });
 
@@ -1644,14 +1761,19 @@ ${closingLine}`;
     }
     updatePartPreview();
 
-    // Get the status value (date string or "Aa")
+    // Get the status value — "Aa" for awaiting approval, or "MM/DD" for approved
     function getPartStatusValue() {
       if (partStatus === 'aa') return 'Aa';
-      return document.getElementById('partDate').value || 'Aa';
+      const dateVal = document.getElementById('partDate').value;
+      if (!dateVal) return 'Aa';
+      // dateVal is YYYY-MM-DD from the date input — reformat to MM/DD for readability in the sheet
+      const [year, month, day] = dateVal.split('-');
+      return `${month}/${day}`;
     }
 
-    // Send to Google Sheet
-    document.getElementById('sendToSheetBtn').addEventListener('click', async () => {
+    // Core send function — extracted so both buttons can use it.
+    // Returns true on success, false on failure or validation error.
+    async function sendPart() {
       const customer = document.getElementById('partCustomer').value.trim();
       const invoice = document.getElementById('partInvoice').value.trim();
       const partNum = document.getElementById('partNumber').value.trim();
@@ -1660,7 +1782,7 @@ ${closingLine}`;
 
       if (!customer || !partNum) {
         showToast('Need at least customer name and part #');
-        return;
+        return false;
       }
 
       // Format Column C: ***P# [number]*** **[description]**
@@ -1670,29 +1792,21 @@ ${closingLine}`;
 
       const highlight = document.getElementById('partWarranty').checked;
 
-      // Check if Google Sheets URL is configured
+      // Check if Google Sheets URL is configured — prompt once and save
       if (!SHEETS_SCRIPT_URL) {
-        // Prompt for the script URL on first use
         const url = prompt(
           'Paste your Google Apps Script Web App URL.\n\n' +
           '(You only need to do this once — it will be saved.)\n\n' +
           'See setup instructions in the Parts tab.'
         );
-        if (!url) return;
+        if (!url) return false;
         SHEETS_SCRIPT_URL = url.trim();
         localStorage.setItem('fb_sheets_url', SHEETS_SCRIPT_URL);
       }
 
-      // Send data to Google Apps Script
-      const sendBtn = document.getElementById('sendToSheetBtn');
-      sendBtn.textContent = 'Sending...';
-      sendBtn.disabled = true;
-
       try {
-        // Use a hidden iframe to call the Apps Script URL.
-        // This is the most reliable method — iframe navigation has ZERO
-        // CORS restrictions, unlike fetch() which gets blocked by the
-        // redirect Google Apps Script does (script.google.com → googleusercontent.com).
+        // JSONP: inject a <script> tag that calls our callback with the real response.
+        // Unlike fetch(), this avoids CORS issues with the Google Apps Script redirect.
         const params = new URLSearchParams({
           customer: customer,
           invoice: invoice,
@@ -1702,19 +1816,15 @@ ${closingLine}`;
         });
         const fullUrl = SHEETS_SCRIPT_URL + '?' + params.toString();
 
-        // JSONP: inject a <script> tag that calls our callback with the real response.
-        // Unlike the old iframe approach, this lets us read success/error from Apps Script.
         await new Promise((resolve, reject) => {
           const cbName = '_sheetCb_' + Date.now();
           const script = document.createElement('script');
 
-          // Cleanup helper — removes script tag and global callback
           const cleanup = () => {
             delete window[cbName];
             if (script.parentNode) script.parentNode.removeChild(script);
           };
 
-          // Apps Script calls this function with the JSON response
           window[cbName] = (data) => {
             cleanup();
             if (data && data.status === 'ok') {
@@ -1729,7 +1839,6 @@ ${closingLine}`;
             }
           };
 
-          // Network failure fires onerror (unlike iframe which fires onload for everything)
           script.onerror = () => {
             cleanup();
             reject(new Error('Could not reach Google Sheets'));
@@ -1738,7 +1847,7 @@ ${closingLine}`;
           script.src = fullUrl + '&callback=' + cbName;
           document.body.appendChild(script);
 
-          // Timeout after 15 seconds — now rejects instead of silently succeeding
+          // Timeout after 15 seconds
           setTimeout(() => {
             if (window[cbName]) {
               cleanup();
@@ -1748,31 +1857,54 @@ ${closingLine}`;
         });
 
         showToast(highlight ? 'Sent (warranty — yellow)!' : 'Sent to Google Sheet!');
-
-        // Log it locally
         saveToPartsLog(customer, invoice, colC, status, highlight);
-
-        // Clear part fields (keep customer & invoice for multi-part orders)
-        document.getElementById('partNumber').value = '';
-        document.getElementById('partDesc').value = '';
-        updatePartPreview();
+        return true;
 
       } catch (err) {
         showToast('Failed: ' + err.message);
         console.error('Sheet send error:', err);
+        return false;
+      }
+    }
+
+    // Send to Google Sheet — sends current part, then clears part # and desc
+    document.getElementById('sendToSheetBtn').addEventListener('click', async () => {
+      const sendBtn = document.getElementById('sendToSheetBtn');
+      sendBtn.textContent = 'Sending...';
+      sendBtn.disabled = true;
+
+      const success = await sendPart();
+
+      if (success) {
+        // Clear part fields (keep customer & invoice for multi-part orders)
+        document.getElementById('partNumber').value = '';
+        document.getElementById('partDesc').value = '';
+        updatePartPreview();
       }
 
       sendBtn.textContent = 'Send to Google Sheet';
       sendBtn.disabled = false;
     });
 
-    // "Add Another Part" — clears part fields but keeps customer/invoice
-    document.getElementById('addAnotherPartBtn').addEventListener('click', () => {
-      document.getElementById('partNumber').value = '';
-      document.getElementById('partDesc').value = '';
-      updatePartPreview();
-      document.getElementById('partNumber').focus();
-      showToast('Add next part for same customer');
+    // "Add Another Part" — sends the current part first, THEN clears the part fields.
+    // Bug fix: old version only cleared fields without sending, so parts were lost.
+    document.getElementById('addAnotherPartBtn').addEventListener('click', async () => {
+      const addBtn = document.getElementById('addAnotherPartBtn');
+      addBtn.textContent = 'Sending...';
+      addBtn.disabled = true;
+
+      const success = await sendPart();
+
+      addBtn.textContent = '+ Add Another Part (Same Customer)';
+      addBtn.disabled = false;
+
+      if (success) {
+        // Clear just the part fields — customer and invoice stay filled in
+        document.getElementById('partNumber').value = '';
+        document.getElementById('partDesc').value = '';
+        updatePartPreview();
+        document.getElementById('partNumber').focus();
+      }
     });
 
     // Clear all parts fields
@@ -1883,6 +2015,165 @@ ${closingLine}`;
     }
 
     // ============================================================
+    // STOCK TAB — Truck inventory viewer
+    // ============================================================
+
+    // URL for the Truck Stock Apps Script web app (stored once in localStorage)
+    let STOCK_SCRIPT_URL = localStorage.getItem('fb_truck_stock_url') || '';
+
+    // All inventory items currently loaded (used for search filtering)
+    let stockItems = [];
+
+    // Render the inventory table from the in-memory stockItems array.
+    // If a filter string is given, only rows matching part # or description are shown.
+    function renderStockTable(filter) {
+      const tbody = document.getElementById('stockTableBody');
+      const emptyState = document.getElementById('stockEmptyState');
+      tbody.innerHTML = '';
+
+      const term = (filter || '').trim().toLowerCase();
+      const visible = term
+        ? stockItems.filter(item =>
+            item.partNum.toLowerCase().includes(term) ||
+            item.desc.toLowerCase().includes(term))
+        : stockItems;
+
+      if (visible.length === 0) {
+        emptyState.style.display = 'block';
+        emptyState.textContent = term ? 'No parts match that search' : 'No stock data — tap Refresh to load';
+        return;
+      }
+      emptyState.style.display = 'none';
+
+      visible.forEach(item => {
+        const tr = document.createElement('tr');
+        const remaining = Number(item.remaining);
+        const minStock = Number(item.minStock);
+
+        // Color coding: red = out of stock, yellow = at or below min stock threshold
+        if (remaining === 0) {
+          tr.className = 'stock-row-out';
+        } else if (!isNaN(minStock) && minStock > 0 && remaining <= minStock) {
+          tr.className = 'stock-row-low';
+        }
+
+        tr.innerHTML = `
+          <td>${item.partNum}</td>
+          <td>${item.desc}</td>
+          <td>${remaining}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Fetch fresh inventory from the Apps Script web app via JSONP.
+    // Same pattern as the Parts tab — avoids CORS issues.
+    async function fetchStockData() {
+      if (!STOCK_SCRIPT_URL) {
+        const url = prompt(
+          'Paste your Truck Stock Apps Script Web App URL.\n\n' +
+          '(You only need to do this once — it will be saved.)'
+        );
+        if (!url) return;
+        STOCK_SCRIPT_URL = url.trim();
+        localStorage.setItem('fb_truck_stock_url', STOCK_SCRIPT_URL);
+      }
+
+      const refreshBtn = document.getElementById('stockRefreshBtn');
+      refreshBtn.textContent = 'Loading...';
+      refreshBtn.disabled = true;
+
+      try {
+        const data = await new Promise((resolve, reject) => {
+          const cbName = '_stockCb_' + Date.now();
+          const script = document.createElement('script');
+
+          const cleanup = () => {
+            delete window[cbName];
+            if (script.parentNode) script.parentNode.removeChild(script);
+          };
+
+          window[cbName] = (data) => {
+            cleanup();
+            if (data && data.status === 'ok') {
+              resolve(data);
+            } else {
+              reject(new Error(data && data.message ? data.message : 'Unknown error'));
+            }
+          };
+
+          script.onerror = () => {
+            cleanup();
+            reject(new Error('Could not reach Stock Sheet'));
+          };
+
+          script.src = STOCK_SCRIPT_URL + '?callback=' + cbName;
+          document.body.appendChild(script);
+
+          setTimeout(() => {
+            if (window[cbName]) {
+              cleanup();
+              reject(new Error('Stock request timed out'));
+            }
+          }, 15000);
+        });
+
+        // Save to localStorage for offline use
+        stockItems = data.items || [];
+        const lastUpdated = new Date().toLocaleString('en-US', {
+          month: 'numeric', day: 'numeric',
+          hour: 'numeric', minute: '2-digit'
+        });
+        localStorage.setItem('fb_truck_stock', JSON.stringify({ items: stockItems, lastUpdated }));
+        document.getElementById('stockLastUpdated').textContent = 'Last updated: ' + lastUpdated;
+
+        renderStockTable(document.getElementById('stockSearch').value);
+        showToast('Stock loaded!');
+
+      } catch (err) {
+        showToast('Failed: ' + err.message);
+        console.error('Stock fetch error:', err);
+      }
+
+      refreshBtn.textContent = 'Refresh';
+      refreshBtn.disabled = false;
+    }
+
+    // Load cached data from localStorage on startup (works offline)
+    function loadCachedStock() {
+      const cached = localStorage.getItem('fb_truck_stock');
+      if (!cached) return;
+      try {
+        const { items, lastUpdated } = JSON.parse(cached);
+        stockItems = items || [];
+        document.getElementById('stockLastUpdated').textContent =
+          'Last updated: ' + (lastUpdated || 'unknown');
+        renderStockTable();
+      } catch (e) {
+        // Corrupted cache — ignore and let user refresh
+      }
+    }
+
+    // Search bar — filters table in real time as user types
+    document.getElementById('stockSearch').addEventListener('input', (e) => {
+      renderStockTable(e.target.value);
+    });
+
+    // Refresh button — fetches fresh data from the sheet
+    document.getElementById('stockRefreshBtn').addEventListener('click', fetchStockData);
+
+    // Change Stock URL — in case the saved URL needs updating
+    document.getElementById('resetStockUrlBtn').addEventListener('click', () => {
+      const current = STOCK_SCRIPT_URL || '(not set)';
+      const url = prompt('Current URL:\n' + current + '\n\nPaste new Stock Apps Script URL:');
+      if (url) {
+        STOCK_SCRIPT_URL = url.trim();
+        localStorage.setItem('fb_truck_stock_url', STOCK_SCRIPT_URL);
+        showToast('Stock URL updated');
+      }
+    });
+
+    // ============================================================
     // INITIALIZATION
     // ============================================================
 
@@ -1890,6 +2181,7 @@ ${closingLine}`;
     renderHistory();
     renderSavedNotes();
     renderPartsLog();
+    loadCachedStock(); // Load any cached truck stock data
 
     // Register service worker for offline support
     if ('serviceWorker' in navigator) {
