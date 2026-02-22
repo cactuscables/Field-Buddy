@@ -12,12 +12,40 @@
   <link rel="manifest" href="manifest.json">
   <!-- Tesseract.js for OCR — runs entirely in the browser, no server needed -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <!-- Industrial typography — Barlow Condensed for headers/labels -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <title>Tech Portal</title>
 
   <style>
     /* ========================================
        BASE STYLES — Dark theme, mobile-first
        ======================================== */
+    :root {
+      /* Industrial dark palette */
+      --bg: #111118;
+      --surface: #1a1f2e;
+      --input-bg: #0d1220;
+      --primary: #e94560;
+      --primary-dark: #c73650;
+      --secondary: #3d7fff;
+      --text: #f0f0f0;
+      --text-muted: #8890a0;
+      --border: #2a3040;
+      --success: #22c55e;
+      --warning: #eab308;
+
+      /* Typography */
+      --font-display: 'Barlow Condensed', sans-serif;
+      --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', 'SF Mono', 'Courier New', monospace;
+
+      /* Spacing */
+      --radius: 8px;
+      --radius-sm: 6px;
+    }
+
     * {
       margin: 0;
       padding: 0;
@@ -25,12 +53,13 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-      background: #1a1a2e;
-      color: #e0e0e0;
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
-      /* Prevent iOS bounce/overscroll */
       overscroll-behavior: none;
+      /* Subtle noise texture for industrial feel */
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
     }
 
     /* ========================================
