@@ -1238,6 +1238,105 @@
     let noteType = 'service'; // 'service' or 'install'
 
     // ============================================================
+    // JOB CONTEXT — Central state that flows to all tabs
+    // ============================================================
+
+    const currentJob = {
+      modelNumber: '',
+      serialNumber: '',
+      brand: '',
+      customerName: '',
+      invoiceNum: ''
+    };
+
+    // Load persisted job from localStorage
+    function loadJob() {
+      const saved = localStorage.getItem('fb_current_job');
+      if (saved) {
+        try {
+          Object.assign(currentJob, JSON.parse(saved));
+          updateJobUI();
+        } catch (e) { /* ignore corrupted data */ }
+      }
+    }
+
+    // Save job to localStorage
+    function saveJob() {
+      localStorage.setItem('fb_current_job', JSON.stringify(currentJob));
+    }
+
+    // Update a job field and propagate to all tabs
+    function setJobField(key, value) {
+      if (currentJob[key] === value) return; // No change, skip propagation
+      currentJob[key] = value;
+      saveJob();
+      updateJobUI();
+      propagateJobData();
+    }
+
+    // Check if a job is active (at least model number set)
+    function hasActiveJob() {
+      return !!(currentJob.modelNumber || currentJob.customerName);
+    }
+
+    // Update the context bar display
+    function updateJobUI() {
+      const bar = document.getElementById('jobContextBar');
+      const active = hasActiveJob();
+
+      bar.classList.toggle('has-job', active);
+
+      if (active) {
+        document.getElementById('jobBarModel').textContent = currentJob.modelNumber || '—';
+        const brandChipEl = document.getElementById('jobBarBrand');
+        if (currentJob.brand) {
+          brandChipEl.textContent = currentJob.brand;
+          brandChipEl.style.display = '';
+        } else {
+          brandChipEl.style.display = 'none';
+        }
+        document.getElementById('jobBarCustomer').textContent = currentJob.customerName || '';
+      }
+
+      // Sync the detail panel fields
+      document.getElementById('jobModel').value = currentJob.modelNumber;
+      document.getElementById('jobSerial').value = currentJob.serialNumber;
+      document.getElementById('jobCustomer').value = currentJob.customerName;
+      document.getElementById('jobInvoice').value = currentJob.invoiceNum;
+    }
+
+    // Push job data into all tab fields
+    function propagateJobData() {
+      // Lookup tab
+      if (currentJob.modelNumber) {
+        document.getElementById('modelInput').value = currentJob.modelNumber;
+        if (currentJob.brand) selectBrand(currentJob.brand);
+      }
+
+      // Notes tab
+      document.getElementById('noteModel').value = currentJob.modelNumber;
+      document.getElementById('noteSerial').value = currentJob.serialNumber;
+
+      // Parts tab
+      document.getElementById('partCustomer').value = currentJob.customerName;
+      document.getElementById('partInvoice').value = currentJob.invoiceNum;
+
+      // Update note preview since model/serial may have changed
+      updateNotePreview();
+    }
+
+    // Clear the current job
+    function clearJob() {
+      currentJob.modelNumber = '';
+      currentJob.serialNumber = '';
+      currentJob.brand = '';
+      currentJob.customerName = '';
+      currentJob.invoiceNum = '';
+      saveJob();
+      updateJobUI();
+    }
+
+    // ============================================================
     // TAB SWITCHING — Bottom tab bar + menu
     // ============================================================
 
@@ -1278,6 +1377,37 @@
       if (e.target === document.getElementById('menuOverlay')) {
         document.getElementById('menuOverlay').classList.remove('visible');
       }
+    });
+
+    // ============================================================
+    // JOB CONTEXT BAR — Interactions
+    // ============================================================
+
+    // Toggle job detail panel on context bar tap
+    document.getElementById('jobContextBar').addEventListener('click', (e) => {
+      if (e.target.id === 'jobClearBtn') return;
+      const panel = document.getElementById('jobDetailPanel');
+      panel.classList.toggle('visible');
+    });
+
+    // Clear job button
+    document.getElementById('jobClearBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      clearJob();
+      document.getElementById('jobDetailPanel').classList.remove('visible');
+    });
+
+    // Job detail panel fields → update job state
+    ['jobModel', 'jobSerial', 'jobCustomer', 'jobInvoice'].forEach(id => {
+      document.getElementById(id).addEventListener('input', () => {
+        const fieldMap = {
+          jobModel: 'modelNumber',
+          jobSerial: 'serialNumber',
+          jobCustomer: 'customerName',
+          jobInvoice: 'invoiceNum'
+        };
+        setJobField(fieldMap[id], document.getElementById(id).value.trim());
+      });
     });
 
     // ============================================================
@@ -1367,6 +1497,10 @@
 
       // Also auto-fill the notes tab model field
       document.getElementById('noteModel').value = model;
+
+      // Update job context with search results
+      setJobField('modelNumber', model);
+      if (selectedBrand) setJobField('brand', selectedBrand);
 
       // Save to search history
       saveToHistory(model, selectedBrand);
@@ -1489,6 +1623,14 @@
     // Listen for changes on all note fields
     ['noteTitle', 'noteModel', 'noteSerial'].forEach(id => {
       document.getElementById(id).addEventListener('input', updateNotePreview);
+    });
+
+    // Sync notes fields back to job context
+    document.getElementById('noteModel').addEventListener('input', () => {
+      setJobField('modelNumber', document.getElementById('noteModel').value.trim());
+    });
+    document.getElementById('noteSerial').addEventListener('input', () => {
+      setJobField('serialNumber', document.getElementById('noteSerial').value.trim());
     });
 
     // Build the formatted note preview
@@ -1900,11 +2042,13 @@ ${closingLine}`;
             div.addEventListener('click', () => {
               if (item.tag.includes('serial') || item.tag.includes('Serial')) {
                 document.getElementById('noteSerial').value = item.text;
+                setJobField('serialNumber', item.text);
                 showToast('Serial filled in Notes tab');
               } else {
                 modelInput.value = item.text;
                 modelInput.dispatchEvent(new Event('input'));
                 document.getElementById('noteModel').value = item.text;
+                setJobField('modelNumber', item.text);
                 showToast('Model number set: ' + item.text);
               }
               ocrOverlay.classList.remove('visible');
@@ -2067,6 +2211,14 @@ ${closingLine}`;
 
     // Set default date to today
     document.getElementById('partDate').valueAsDate = new Date();
+
+    // Sync parts fields back to job context
+    document.getElementById('partCustomer').addEventListener('input', () => {
+      setJobField('customerName', document.getElementById('partCustomer').value.trim());
+    });
+    document.getElementById('partInvoice').addEventListener('input', () => {
+      setJobField('invoiceNum', document.getElementById('partInvoice').value.trim());
+    });
 
     // Update preview as fields change
     ['partNumber', 'partDesc'].forEach(id => {
@@ -2504,6 +2656,7 @@ ${closingLine}`;
     renderSavedNotes();
     renderPartsLog();
     loadCachedStock(); // Load any cached truck stock data
+    loadJob(); // Restore persisted job context
 
     // Register service worker for offline support
     if ('serviceWorker' in navigator) {
