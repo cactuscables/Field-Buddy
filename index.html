@@ -66,19 +66,22 @@
        HEADER
        ======================================== */
     .header {
-      background: #16213e;
-      padding: 16px 20px;
+      background: var(--surface);
+      padding: 12px 20px;
       text-align: center;
-      border-bottom: 2px solid #0f3460;
+      border-bottom: 2px solid var(--border);
       position: sticky;
       top: 0;
       z-index: 100;
     }
 
     .header h1 {
-      font-size: 20px;
-      color: #e94560;
-      letter-spacing: 1px;
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--primary);
+      letter-spacing: 2px;
+      text-transform: uppercase;
     }
 
     /* ========================================
@@ -86,10 +89,10 @@
        ======================================== */
     .tab-bar {
       display: flex;
-      background: #16213e;
-      border-bottom: 2px solid #0f3460;
+      background: var(--surface);
+      border-bottom: 2px solid var(--border);
       position: sticky;
-      top: 54px;  /* below header */
+      top: 54px;
       z-index: 99;
     }
 
@@ -98,7 +101,7 @@
       padding: 12px;
       background: none;
       border: none;
-      color: #8a8a9a;
+      color: var(--text-muted);
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
@@ -107,11 +110,10 @@
     }
 
     .tab-btn.active {
-      color: #e94560;
-      border-bottom-color: #e94560;
+      color: var(--primary);
+      border-bottom-color: var(--primary);
     }
 
-    /* Tab content panels — only show the active one */
     .tab-content {
       display: none;
       padding: 20px;
@@ -128,12 +130,14 @@
        ======================================== */
     label {
       display: block;
-      font-size: 12px;
-      color: #8a8a9a;
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 6px;
-      margin-top: 16px;
+      letter-spacing: 1.5px;
+      margin-bottom: 8px;
+      margin-top: 18px;
     }
 
     label:first-child {
@@ -141,24 +145,27 @@
     }
 
     input[type="text"],
+    input[type="date"],
     select,
     textarea {
       width: 100%;
-      padding: 12px 14px;
-      background: #0f3460;
-      border: 1px solid #1a4a7a;
-      border-radius: 8px;
-      color: #e0e0e0;
-      font-size: 16px; /* 16px prevents iOS zoom on focus */
+      padding: 16px 18px;
+      background: var(--input-bg);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 18px;
       font-family: inherit;
       outline: none;
       transition: border-color 0.2s;
+      min-height: 54px;
     }
 
     input[type="text"]:focus,
+    input[type="date"]:focus,
     select:focus,
     textarea:focus {
-      border-color: #e94560;
+      border-color: var(--primary);
     }
 
     textarea {
@@ -166,61 +173,71 @@
       min-height: 100px;
     }
 
-    /* Primary action button */
     .btn-primary {
       width: 100%;
-      padding: 14px;
-      background: #e94560;
+      padding: 18px;
+      background: var(--primary);
       color: white;
       border: none;
-      border-radius: 8px;
-      font-size: 16px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-display);
+      font-size: 18px;
       font-weight: 700;
       cursor: pointer;
       margin-top: 20px;
-      letter-spacing: 0.5px;
-      transition: background 0.2s;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      transition: background 0.15s, transform 0.1s;
+      min-height: 60px;
     }
 
     .btn-primary:active {
-      background: #c73650;
+      background: var(--primary-dark);
+      transform: scale(0.97);
     }
 
-    /* Secondary / outline button */
     .btn-secondary {
       width: 100%;
-      padding: 12px;
+      padding: 14px;
       background: transparent;
-      color: #e94560;
-      border: 2px solid #e94560;
-      border-radius: 8px;
-      font-size: 14px;
+      color: var(--primary);
+      border: 2px solid var(--primary);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-display);
+      font-size: 16px;
       font-weight: 600;
       cursor: pointer;
       margin-top: 10px;
-      transition: all 0.2s;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: all 0.15s, transform 0.1s;
+      min-height: 48px;
     }
 
     .btn-secondary:active {
-      background: #e94560;
+      background: var(--primary);
       color: white;
+      transform: scale(0.97);
     }
 
-    /* Small inline button */
     .btn-small {
-      padding: 8px 16px;
-      background: #0f3460;
-      color: #e0e0e0;
-      border: 1px solid #1a4a7a;
-      border-radius: 6px;
-      font-size: 13px;
+      padding: 14px 20px;
+      background: var(--surface);
+      color: var(--text);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 15px;
+      font-weight: 600;
       cursor: pointer;
-      margin-top: 6px;
-      margin-right: 6px;
+      margin-top: 8px;
+      margin-right: 8px;
+      min-height: 48px;
+      transition: border-color 0.15s, transform 0.1s;
     }
 
     .btn-small:active {
-      background: #1a4a7a;
+      border-color: var(--primary);
+      transform: scale(0.97);
     }
 
     /* ========================================
@@ -229,25 +246,34 @@
     .brand-chips {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 8px;
+      gap: 10px;
+      margin-top: 10px;
     }
 
     .brand-chip {
-      padding: 8px 14px;
-      background: #0f3460;
-      border: 1px solid #1a4a7a;
-      border-radius: 20px;
-      color: #c0c0d0;
-      font-size: 13px;
+      padding: 12px 18px;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: 24px;
+      color: var(--text-muted);
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.15s, transform 0.1s;
+      min-height: 48px;
+      display: flex;
+      align-items: center;
     }
 
     .brand-chip.selected {
-      background: #e94560;
-      border-color: #e94560;
+      background: var(--primary);
+      border-color: var(--primary);
       color: white;
+    }
+
+    .brand-chip:active {
+      transform: scale(0.95);
     }
 
     /* ========================================
@@ -266,32 +292,33 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 14px;
-      background: #0f3460;
-      border-radius: 8px;
-      margin-bottom: 8px;
+      padding: 16px;
+      background: var(--surface);
+      border-radius: var(--radius);
+      margin-bottom: 10px;
       text-decoration: none;
-      color: #e0e0e0;
-      border: 1px solid #1a4a7a;
-      transition: border-color 0.2s;
+      color: var(--text);
+      border: 2px solid var(--border);
+      transition: border-color 0.15s;
+      min-height: 56px;
     }
 
     .result-link:active {
-      border-color: #e94560;
+      border-color: var(--primary);
     }
 
     .result-link .site-name {
-      font-weight: 600;
-      font-size: 15px;
+      font-weight: 700;
+      font-size: 16px;
     }
 
     .result-link .site-note {
-      font-size: 12px;
-      color: #8a8a9a;
+      font-size: 13px;
+      color: var(--text-muted);
     }
 
     .result-link .arrow {
-      color: #e94560;
+      color: var(--primary);
       font-size: 18px;
     }
 
@@ -299,32 +326,32 @@
        NOTES SECTION
        ======================================== */
     .note-preview {
-      background: #0f3460;
-      border: 1px solid #1a4a7a;
-      border-radius: 8px;
+      background: var(--input-bg);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
       padding: 16px;
       margin-top: 16px;
-      font-family: 'Courier New', monospace;
-      font-size: 13px;
+      font-family: var(--font-mono);
+      font-size: 15px;
       line-height: 1.6;
       white-space: pre-wrap;
-      color: #c0c0d0;
+      color: var(--text-muted);
       min-height: 120px;
     }
 
-    /* Toast notification for "Copied!" feedback */
     .toast {
       position: fixed;
-      bottom: 80px;
+      bottom: 100px;
       left: 50%;
       transform: translateX(-50%) translateY(20px);
-      background: #4caf50;
+      background: var(--success);
       color: white;
-      padding: 12px 24px;
-      border-radius: 8px;
-      font-weight: 600;
+      padding: 14px 28px;
+      border-radius: var(--radius);
+      font-weight: 700;
+      font-size: 16px;
       opacity: 0;
-      transition: all 0.3s;
+      transition: all 0.2s;
       pointer-events: none;
       z-index: 1000;
     }
@@ -341,37 +368,39 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 12px 14px;
-      background: #0f3460;
-      border: 1px solid #1a4a7a;
-      border-radius: 8px;
-      margin-bottom: 8px;
+      padding: 16px;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 10px;
       cursor: pointer;
+      min-height: 56px;
+      transition: border-color 0.15s;
     }
 
     .history-item:active {
-      border-color: #e94560;
+      border-color: var(--primary);
     }
 
     .history-model {
-      font-weight: 600;
-      font-size: 15px;
+      font-weight: 700;
+      font-size: 16px;
     }
 
     .history-brand {
-      font-size: 12px;
-      color: #8a8a9a;
+      font-size: 13px;
+      color: var(--text-muted);
     }
 
     .history-date {
-      font-size: 12px;
-      color: #8a8a9a;
+      font-size: 13px;
+      color: var(--text-muted);
     }
 
     .empty-state {
       text-align: center;
       padding: 40px 20px;
-      color: #8a8a9a;
+      color: var(--text-muted);
     }
 
     /* ========================================
@@ -383,23 +412,26 @@
       margin-top: 8px;
       border-radius: 8px;
       overflow: hidden;
-      border: 1px solid #1a4a7a;
+      border: 2px solid var(--border);
     }
 
     .toggle-btn {
       flex: 1;
-      padding: 10px;
-      background: #0f3460;
+      padding: 16px;
+      background: var(--input-bg);
       border: none;
-      color: #8a8a9a;
-      font-size: 13px;
+      color: var(--text-muted);
+      font-family: var(--font-display);
+      font-size: 15px;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.15s;
+      min-height: 52px;
+      letter-spacing: 0.5px;
     }
 
     .toggle-btn.active {
-      background: #e94560;
+      background: var(--primary);
       color: white;
     }
 
@@ -407,13 +439,14 @@
     .bullet-row {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin-bottom: 6px;
+      gap: 12px;
+      margin-bottom: 10px;
     }
 
     .bullet-row span {
-      color: #e94560;
+      color: var(--primary);
       font-weight: bold;
+      font-size: 20px;
     }
 
     .bullet-row input {
@@ -421,45 +454,58 @@
     }
 
     .remove-bullet {
-      background: none;
+      background: rgba(233, 69, 96, 0.15);
       border: none;
-      color: #8a8a9a;
-      font-size: 18px;
+      color: var(--primary);
+      font-size: 22px;
       cursor: pointer;
-      padding: 4px 8px;
+      padding: 0;
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+
+    .remove-bullet:active {
+      background: rgba(233, 69, 96, 0.3);
     }
 
     /* ========================================
        SAVED NOTES LIST
        ======================================== */
     .saved-note-item {
-      padding: 12px 14px;
-      background: #0f3460;
-      border: 1px solid #1a4a7a;
-      border-radius: 8px;
-      margin-bottom: 8px;
+      padding: 16px;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 10px;
       cursor: pointer;
+      transition: border-color 0.15s;
     }
 
     .saved-note-item:active {
-      border-color: #e94560;
+      border-color: var(--primary);
     }
 
     .saved-note-title {
-      font-weight: 600;
-      font-size: 15px;
+      font-weight: 700;
+      font-size: 16px;
     }
 
     .saved-note-meta {
-      font-size: 12px;
-      color: #8a8a9a;
-      margin-top: 4px;
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 6px;
     }
 
     .section-divider {
       border: none;
-      border-top: 1px solid #1a4a7a;
-      margin: 20px 0;
+      border-top: 2px dashed var(--border);
+      margin: 24px 0;
     }
 
     /* ========================================
@@ -475,38 +521,35 @@
     }
 
     .camera-btn {
-      width: 48px;
-      height: 48px;
-      background: #e94560;
+      width: 56px;
+      height: 56px;
+      background: var(--primary);
       border: none;
-      border-radius: 8px;
+      border-radius: var(--radius-sm);
       color: white;
-      font-size: 22px;
+      font-size: 24px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
+      transition: background 0.15s, transform 0.1s;
     }
 
     .camera-btn:active {
-      background: #c73650;
+      background: var(--primary-dark);
+      transform: scale(0.95);
     }
 
-    /* Hidden file input for camera */
     #cameraInput {
       display: none;
     }
 
-    /* OCR processing overlay */
     .ocr-overlay {
       display: none;
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.85);
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.9);
       z-index: 200;
       flex-direction: column;
       align-items: center;
@@ -519,24 +562,26 @@
     }
 
     .ocr-status {
-      color: #e94560;
-      font-size: 18px;
-      font-weight: 600;
+      color: var(--primary);
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 700;
       margin-bottom: 12px;
+      letter-spacing: 1px;
     }
 
     .ocr-progress {
-      width: 200px;
-      height: 6px;
-      background: #0f3460;
-      border-radius: 3px;
+      width: 220px;
+      height: 8px;
+      background: var(--surface);
+      border-radius: 4px;
       overflow: hidden;
       margin-bottom: 20px;
     }
 
     .ocr-progress-bar {
       height: 100%;
-      background: #e94560;
+      background: var(--primary);
       width: 0%;
       transition: width 0.3s;
     }
@@ -549,7 +594,6 @@
       object-fit: contain;
     }
 
-    /* OCR results — list of detected text strings to pick from */
     .ocr-results {
       width: 100%;
       max-width: 400px;
@@ -558,45 +602,46 @@
     }
 
     .ocr-results label {
-      color: #e94560;
+      color: var(--primary);
       margin-bottom: 8px;
     }
 
     .ocr-result-item {
-      padding: 12px 14px;
-      background: #0f3460;
-      border: 1px solid #1a4a7a;
-      border-radius: 8px;
-      margin-bottom: 6px;
-      color: #e0e0e0;
-      font-family: monospace;
-      font-size: 15px;
+      padding: 16px;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 8px;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 16px;
       cursor: pointer;
-      transition: border-color 0.2s;
+      min-height: 56px;
+      transition: border-color 0.15s;
     }
 
     .ocr-result-item:active {
-      border-color: #e94560;
-      background: #1a4a7a;
+      border-color: var(--primary);
     }
 
     .ocr-result-item .ocr-tag {
-      font-family: -apple-system, sans-serif;
-      font-size: 11px;
-      color: #8a8a9a;
+      font-family: var(--font-body);
+      font-size: 12px;
+      color: var(--text-muted);
       display: block;
       margin-top: 4px;
     }
 
     .ocr-close-btn {
       margin-top: 16px;
-      padding: 12px 32px;
+      padding: 16px 36px;
       background: transparent;
-      color: #8a8a9a;
-      border: 1px solid #8a8a9a;
-      border-radius: 8px;
-      font-size: 14px;
+      color: var(--text-muted);
+      border: 2px solid var(--text-muted);
+      border-radius: var(--radius-sm);
+      font-size: 16px;
       cursor: pointer;
+      min-height: 52px;
     }
 
     /* ========================================
@@ -609,62 +654,58 @@
       margin-bottom: 6px;
     }
 
-    /* Search input stretches to fill available space */
     .stock-controls input {
       flex: 1;
     }
 
     .stock-last-updated {
       font-size: 12px;
-      color: #8a8a9a;
+      color: var(--text-muted);
       margin-bottom: 12px;
     }
 
     .stock-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 14px;
+      font-size: 15px;
     }
 
     .stock-table th {
       text-align: left;
-      padding: 8px 6px;
-      color: #8a8a9a;
-      border-bottom: 1px solid #0f3460;
-      font-size: 12px;
+      padding: 12px 8px;
+      color: var(--text-muted);
+      border-bottom: 2px solid var(--border);
+      font-family: var(--font-display);
+      font-size: 13px;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 1px;
     }
 
     .stock-table td {
-      padding: 10px 6px;
-      border-bottom: 1px solid #0f3460;
+      padding: 12px 8px;
+      border-bottom: 1px solid var(--border);
       vertical-align: top;
     }
 
-    /* Part # column — monospace so numbers align */
     .stock-table td:first-child {
-      font-family: monospace;
-      font-size: 13px;
+      font-family: var(--font-mono);
+      font-size: 14px;
     }
 
-    /* Qty column — right-align, bold */
     .stock-table td:last-child {
       text-align: right;
       font-weight: 700;
       white-space: nowrap;
     }
 
-    /* Red row — out of stock */
     .stock-row-out td {
       background: rgba(233, 69, 96, 0.15);
-      color: #e94560;
+      color: var(--primary);
     }
 
-    /* Yellow row — low stock (at or below min) */
     .stock-row-low td {
-      background: rgba(255, 193, 7, 0.12);
-      color: #ffc107;
+      background: rgba(234, 179, 8, 0.12);
+      color: var(--warning);
     }
   </style>
 </head>
@@ -785,13 +826,13 @@
     </div>
     <!-- Date picker, shown only when "Approved" is selected -->
     <div id="partDateRow" style="display:none; margin-top:8px;">
-      <input type="date" id="partDate" style="width:100%; padding:12px 14px; background:#0f3460;
-        border:1px solid #1a4a7a; border-radius:8px; color:#e0e0e0; font-size:16px;">
+      <input type="date" id="partDate" style="width:100%; padding:16px 18px; background:#0d1220;
+        border:2px solid #2a3040; border-radius:6px; color:#f0f0f0; font-size:18px;">
     </div>
 
     <!-- Warranty toggle — highlights row yellow in the sheet -->
     <label style="margin-top:16px; display:flex; align-items:center; gap:10px; cursor:pointer;
-      text-transform:none; font-size:14px; color:#e0e0e0; letter-spacing:0;">
+      text-transform:none; font-size:14px; color:#f0f0f0; letter-spacing:0;">
       <input type="checkbox" id="partWarranty" style="width:20px; height:20px; accent-color:#e94560;">
       Warranty (highlight row yellow)
     </label>
