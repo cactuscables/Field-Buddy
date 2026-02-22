@@ -4,8 +4,8 @@
   "description": "Appliance repair parts lookup and workorder notes",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1a1a2e",
-  "theme_color": "#16213e",
+  "background_color": "#111118",
+  "theme_color": "#1a1f2e",
   "orientation": "portrait",
   "icons": [
     {
