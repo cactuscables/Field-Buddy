@@ -140,6 +140,11 @@ All colors, fonts, and spacing defined as CSS variables:
 - `fb_truck_stock` — cached stock data
 - `fb_parts_log` — sent parts log (max 200)
 
+## Gotchas
+- **Toggle button selectors must be scoped** — Notes uses `.toggle-btn[data-type]`, Parts uses `.toggle-btn[data-status]`. Using unscoped `.toggle-btn` will create cross-tab listener collisions.
+- **Inline styles can't use `var()`** — any remaining inline `style=` attributes with hardcoded colors should be migrated to CSS classes when touched.
+- **Service worker caching** — users may need to close/reopen the app to get updates even after bumping `CACHE_NAME`. Force-refresh doesn't work on iOS PWAs.
+
 ## What NOT to Do
 - Don't add npm/build tooling — this is intentionally a zero-build project
 - Don't split into multiple files unless there's a strong reason — single-file keeps deployment simple
