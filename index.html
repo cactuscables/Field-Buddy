@@ -1135,8 +1135,7 @@
       </div>
       <!-- Date picker, shown only when "Approved" is selected -->
       <div id="partDateRow" style="display:none; margin-top:8px;">
-        <input type="date" id="partDate" style="width:100%; padding:16px 18px; background:#0d1220;
-          border:2px solid #2a3040; border-radius:6px; color:#f0f0f0; font-size:18px;">
+        <input type="date" id="partDate">
       </div>
 
       <!-- Warranty toggle — highlights row yellow in the sheet -->
@@ -1470,6 +1469,8 @@
     // ============================================================
 
     function switchTab(tabName) {
+      // Close menu overlay if open
+      document.getElementById('menuOverlay').classList.remove('visible');
       // Deactivate all tabs and panels
       document.querySelectorAll('.bottom-tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -1711,9 +1712,10 @@
     const notePreview = document.getElementById('notePreview');
 
     // Note type toggle (Service Call vs Install Labor)
-    document.querySelectorAll('.toggle-btn').forEach(btn => {
+    // Scoped to [data-type] to avoid collision with Parts tab toggles ([data-status])
+    document.querySelectorAll('.toggle-btn[data-type]').forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.toggle-btn[data-type]').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         noteType = btn.dataset.type;
         updateNotePreview();
@@ -1919,7 +1921,7 @@ ${closingLine}`;
 
           // Restore note type
           noteType = note.noteType || 'service';
-          document.querySelectorAll('.toggle-btn').forEach(btn => {
+          document.querySelectorAll('.toggle-btn[data-type]').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.type === noteType);
           });
 
