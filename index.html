@@ -879,6 +879,48 @@
       font-weight: 600;
       letter-spacing: 0.5px;
     }
+/* ========================================
+   NOTES TAB IMPROVEMENTS
+   ======================================== */
+/* Sticky notes action bar */
+.notes-sticky-footer {
+  position: sticky;
+  bottom: 80px;
+  background: var(--bg);
+  padding: 12px 0;
+  border-top: 2px dashed var(--border);
+  margin-top: 20px;
+  z-index: 10;
+}
+
+/* Collapsible preview */
+.preview-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  padding: 12px 0;
+}
+
+.preview-toggle .toggle-arrow {
+  transition: transform 0.2s;
+  font-size: 16px;
+  color: var(--text-muted);
+}
+
+.preview-toggle.open .toggle-arrow {
+  transform: rotate(180deg);
+}
+
+.preview-collapsible {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.25s ease-out;
+}
+
+.preview-collapsible.open {
+  max-height: 500px;
+}
   </style>
 </head>
 
@@ -979,11 +1021,21 @@
     </div>
     <button class="btn-small" id="addBulletBtn">+ Add bullet</button>
 
-    <label>Preview</label>
-    <div class="note-preview" id="notePreview"></div>
+    <!-- Preview — collapsible -->
+    <div class="preview-toggle" id="previewToggle">
+      <label style="margin:0; cursor:pointer; pointer-events:none;">Preview</label>
+      <span class="toggle-arrow">&#9660;</span>
+    </div>
+    <div class="preview-collapsible" id="previewCollapsible">
+      <div class="note-preview" id="notePreview"></div>
+    </div>
 
-    <button class="btn-primary" id="copyNoteBtn">Copy to Clipboard</button>
-    <button class="btn-secondary" id="copyOpenDispatchBtn">Copy &amp; Open Dispatch</button>
+    <!-- Sticky action buttons -->
+    <div class="notes-sticky-footer">
+      <button class="btn-primary" id="copyNoteBtn">COPY TO CLIPBOARD</button>
+      <button class="btn-secondary" id="copyOpenDispatchBtn">COPY &amp; OPEN DISPATCH</button>
+    </div>
+
     <button class="btn-secondary" id="saveNoteBtn">Save Note</button>
     <button class="btn-secondary" id="clearNoteBtn">Clear</button>
 
@@ -1607,6 +1659,13 @@
       });
       // Update preview as user types
       row.querySelector('input').addEventListener('input', updateNotePreview);
+      // Enter key creates next bullet
+      row.querySelector('input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          addBullet();
+        }
+      });
       bulletContainer.appendChild(row);
       // Focus the new input
       row.querySelector('input').focus();
@@ -1673,6 +1732,14 @@ ${closingLine}`;
 
     // Initial preview render
     updateNotePreview();
+
+    // Preview toggle — collapsed by default
+    document.getElementById('previewToggle').addEventListener('click', () => {
+      const toggle = document.getElementById('previewToggle');
+      const collapsible = document.getElementById('previewCollapsible');
+      toggle.classList.toggle('open');
+      collapsible.classList.toggle('open');
+    });
 
     // ============================================================
     // COPY NOTE TO CLIPBOARD
