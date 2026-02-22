@@ -7,15 +7,15 @@ A Progressive Web App for appliance repair workflow. Used daily on iPhone Safari
 **Repo:** https://github.com/cactuscables/Field-Buddy
 
 ## Architecture
-- **Single-file PWA** — all HTML, CSS, and JS live in `index.html` (~1800 lines)
+- **Single-file PWA** — all HTML, CSS, and JS live in `index.html` (~2400 lines)
 - **No build step** — edit `index.html` directly, deploy via `git push` to GitHub Pages
 - **No frameworks** — vanilla HTML/CSS/JS only
 - **Offline-capable** via service worker (`sw.js`) with network-first, cache-fallback strategy
-- **External dependency:** Tesseract.js v5 loaded from CDN (OCR feature)
+- **External dependencies:** Tesseract.js v5 (CDN), Google Fonts (Barlow Condensed, JetBrains Mono)
 
 ## Local Development
 ```bash
-cd ~/Projects/Field-Buddy && python3 -m http.server 8080
+cd ~/Projects/field-buddy && python3 -m http.server 8080
 ```
 Then open http://localhost:8080 in browser. No npm, no build, no compilation.
 
@@ -25,67 +25,124 @@ git add -A && git commit -m "description" && git push origin main
 ```
 GitHub Pages serves from `main` branch automatically. Changes are live in ~60 seconds.
 
-**Important:** After updating `sw.js`, bump `CACHE_NAME` version (currently `'tech-portal-v2'`) so browsers pick up the new service worker.
+**Important:** After updating `sw.js`, bump `CACHE_NAME` version (currently `'tech-portal-v4'`) so browsers pick up the new service worker.
 
-## App Structure (Tabs in index.html)
+## Navigation Structure
 
-### Lookup Tab (lines ~660-700)
-- Model number input with brand auto-detection from prefix patterns
-- Generates deep-links to: Marcone, Sears Parts Direct, Reliable Parts
-- Brand-specific links for Bosch, Thermador, Viking, GE
-- Auto-copies model number to clipboard
-- Search history saved in localStorage
+### Bottom Tab Bar (fixed, 3 primary tabs)
+- **Lookup** — model search + brand detection + parts site links
+- **Notes** — workorder note builder
+- **Parts** — send parts to Google Sheet
 
-### Notes Tab (lines ~1015-1206)
+### Menu Drawer (via "More" button)
+- **History** — past searches
+- **Stock** — truck inventory
+
+### Job Context Bar (sticky header)
+- Shows "TECH PORTAL" when no job is active
+- Shows model number, brand chip, and customer name when a job is active
+- Tap to expand/edit job details (model, serial, customer, invoice)
+- Clear button to end current job
+
+## Job Context System
+
+Central state object that flows data between all tabs:
+```javascript
+const currentJob = {
+  modelNumber: '',   // → Lookup input, Notes model
+  serialNumber: '',  // → Notes serial
+  brand: '',         // → Lookup brand chip
+  customerName: '',  // → Parts customer
+  invoiceNum: ''     // → Parts invoice
+};
+```
+- **localStorage key:** `fb_current_job`
+- Changes in any tab propagate to all others automatically
+- Job persists across page refreshes
+- Infinite-loop guard: `setJobField()` skips propagation if value unchanged
+
+## App Features
+
+### Lookup Tab
+- Model number input with camera button for OCR
+- Brand auto-detection from model prefix patterns
+- 12 brand chips for manual override
+- Search generates deep-links to parts sites (Marcone, Sears Parts Direct, Reliable Parts + brand-specific)
+- "Open All" button opens all sites at once
+- Auto-copies model to clipboard, auto-updates job context
+
+### Notes Tab
 - Workorder note template with markdown formatting
 - Service Call / Install Labor toggle
-- Auto-fills date and model number from Lookup tab
-- Copy to clipboard, save/load via localStorage
+- Model/Serial auto-filled from job context
+- **Enter key** in a bullet input creates the next bullet
+- **Collapsible preview** (collapsed by default, saves space)
+- **Sticky action footer** — Copy and Copy & Open Dispatch buttons always visible
+- Save/load notes to localStorage
 
-### Parts Tab (lines ~666-713)
-- Sends part orders to "Dustin's Parts" Google Sheet
-- Fields: Customer, Invoice #, Part #, Description, Status, Warranty flag
-- Column C format: `***P# [number]*** **[description]**`
-- Warranty flag highlights entire row yellow in the sheet
-- Uses hidden iframe to POST to Google Apps Script (avoids CORS)
+### Parts Tab
+- Sends part orders to "Dustin's Parts" Google Sheet via JSONP
+- Customer/Invoice auto-filled from job context
+- **Quick Send mode**: after first part sent, customer/invoice/status collapse to a summary strip; only Part # and Description remain visible
+- Tap the summary strip to expand and edit
+- Clear resets to full form
+- Warranty checkbox highlights row yellow in sheet
 
-### History Tab
-- All past searches saved and reloadable from localStorage
-
-### OCR/Camera (lines ~1264-1603)
+### OCR/Camera
 - Tesseract.js for in-browser OCR of model/serial tags
-- Auto-rotate: tries 0, 90, 270 degrees for sideways tags
+- Auto-rotate: tries 0°, 90°, 270° for sideways tags
 - Image preprocessing and downscaling for performance
 - Smart label detection (MOD., SER., MODEL, SERIAL patterns)
+- Results flow to job context automatically
+
+### Truck Stock
+- Fetches inventory from separate Google Apps Script
+- Real-time search filtering
+- Color coding: red = out of stock, yellow = low stock
+- Cached in localStorage for offline use
+
+## CSS Architecture
+
+### Custom Properties (`:root`)
+All colors, fonts, and spacing defined as CSS variables:
+- `--bg: #111118` — page background
+- `--surface: #1a1f2e` — cards, panels
+- `--input-bg: #0d1220` — input fields
+- `--primary: #e94560` — primary accent (red)
+- `--secondary: #3d7fff` — secondary accent (blue)
+- `--text: #f0f0f0` / `--text-muted: #8890a0`
+- `--border: #2a3040`
+- `--font-display: 'Barlow Condensed'` — headers, labels, buttons
+- `--font-mono: 'JetBrains Mono'` — part numbers, previews
+
+### Design Language
+- Industrial/utilitarian aesthetic
+- 2px borders, 6-8px border radius
+- Minimum 48px touch targets (60px for primary actions)
+- Subtle noise texture on background
+- Blueprint-style dashed section dividers
+- `prefers-reduced-motion` respected
 
 ## Google Sheets Integration
 - **Backend:** `google-apps-script.js` — deployed as Google Apps Script Web App
-- **Sheet name:** "Parts to be ordered" tab within the "Dustin's Parts" spreadsheet (hard-coded in script)
+- **Sheet name:** "Parts to be ordered" tab within the "Dustin's Parts" spreadsheet
 - **Columns:** A=Customer, B=Invoice#, C=Part Info, D=Status
 - **Row logic:** Scans column A for first empty row (fills gaps)
 - **Auth:** Script URL stored in browser localStorage (user enters once)
-- **CORS workaround:** Hidden iframe GET request instead of fetch()
+- **CORS workaround:** JSONP (script tag injection) instead of fetch()
 
-## Key Configuration (in index.html)
-
-### Sites Config (~line 745)
-`SITES` object maps brand names to arrays of search URLs. `{model}` placeholder gets replaced.
-
-### Brand Detection (~line 805)
-`BRAND_PATTERNS` array of regex prefixes mapped to brand names. Order matters — first match wins.
-
-## Common Brands
-Whirlpool family (Whirlpool/Maytag/KitchenAid/Amana), Samsung, LG, Frigidaire, GE, Electrolux, Bosch, Thermador, Viking
-
-## Conventions
-- Heavy inline comments explaining what each section does
-- CSS organized by component with section headers
-- Dark theme: background `#1a1a2e`, header `#16213e`, accent `#0f3460`
-- Mobile-first design, tested primarily on iPhone Safari
-- localStorage keys prefixed with app context (search history, notes, sheet URL)
+## localStorage Keys
+- `fb_current_job` — active job context
+- `fb_history` — search history (max 50)
+- `fb_notes` — saved notes (max 100)
+- `fb_sheets_url` — Google Apps Script URL for parts
+- `fb_truck_stock_url` — Google Apps Script URL for stock
+- `fb_truck_stock` — cached stock data
+- `fb_parts_log` — sent parts log (max 200)
 
 ## What NOT to Do
 - Don't add npm/build tooling — this is intentionally a zero-build project
 - Don't split into multiple files unless there's a strong reason — single-file keeps deployment simple
 - Don't remove inline comments — they're there for learning
 - Don't change the Google Sheet column format without checking with the boss
+- Don't break the JSONP callback pattern for Google Sheets integration
