@@ -5,7 +5,7 @@
   <!-- Makes it mobile-friendly — scales to phone screen width -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <!-- PWA stuff — theme color for browser chrome, manifest for install -->
-  <meta name="theme-color" content="#16213e">
+  <meta name="theme-color" content="#1a1f2e">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Tech Portal">
@@ -965,6 +965,25 @@
 
 .parts-full-form.collapsed {
   display: none;
+}
+
+/* ========================================
+   MOTION & TRANSITIONS
+   ======================================== */
+.tab-content.active {
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
   </style>
 </head>
