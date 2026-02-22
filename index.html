@@ -921,6 +921,51 @@
 .preview-collapsible.open {
   max-height: 500px;
 }
+
+/* ========================================
+   PARTS TAB — Quick Send Mode
+   ======================================== */
+.parts-context-strip {
+  display: none;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.parts-context-strip.visible {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.parts-context-strip:active {
+  border-color: var(--primary);
+}
+
+.parts-context-strip .strip-info {
+  font-size: 15px;
+  color: var(--text);
+}
+
+.parts-context-strip .strip-info span {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.parts-context-strip .strip-edit {
+  color: var(--secondary);
+  font-size: 13px;
+  font-family: var(--font-display);
+  letter-spacing: 0.5px;
+}
+
+.parts-full-form.collapsed {
+  display: none;
+}
   </style>
 </head>
 
@@ -1046,40 +1091,53 @@
 
   <!-- ==================== PARTS TAB ==================== -->
   <div id="parts" class="tab-content">
-    <label for="partCustomer">Customer Name</label>
-    <input type="text" id="partCustomer" placeholder="e.g. Smith, John">
+    <!-- Context strip (shows after first send) -->
+    <div class="parts-context-strip" id="partsContextStrip">
+      <div class="strip-info">
+        <strong id="stripCustomer">—</strong><br>
+        <span>Inv: <span id="stripInvoice">—</span> | <span id="stripStatus">Aa</span></span>
+      </div>
+      <div class="strip-edit">TAP TO EDIT &#9660;</div>
+    </div>
 
-    <label for="partInvoice">Invoice #</label>
-    <input type="text" id="partInvoice" placeholder="e.g. 12345"
-           autocomplete="off" spellcheck="false">
+    <!-- Full form (collapses after first send in Quick Send mode) -->
+    <div class="parts-full-form" id="partsFullForm">
+      <label for="partCustomer">Customer Name</label>
+      <input type="text" id="partCustomer" placeholder="e.g. Smith, John">
 
+      <label for="partInvoice">Invoice #</label>
+      <input type="text" id="partInvoice" placeholder="e.g. 12345"
+             autocomplete="off" spellcheck="false">
+
+      <label>Status</label>
+      <div class="toggle-group">
+        <button class="toggle-btn active" data-status="aa">Aa (Awaiting Approval)</button>
+        <button class="toggle-btn" data-status="date">Approved (Date)</button>
+      </div>
+      <!-- Date picker, shown only when "Approved" is selected -->
+      <div id="partDateRow" style="display:none; margin-top:8px;">
+        <input type="date" id="partDate" style="width:100%; padding:16px 18px; background:#0d1220;
+          border:2px solid #2a3040; border-radius:6px; color:#f0f0f0; font-size:18px;">
+      </div>
+
+      <!-- Warranty toggle — highlights row yellow in the sheet -->
+      <label style="margin-top:16px; display:flex; align-items:center; gap:10px; cursor:pointer;
+        text-transform:none; font-size:14px; color:#f0f0f0; letter-spacing:0;">
+        <input type="checkbox" id="partWarranty" style="width:20px; height:20px; accent-color:#e94560;">
+        Warranty (highlight row yellow)
+      </label>
+
+      <label>Preview (Column C format)</label>
+      <div class="note-preview" id="partPreview" style="min-height:40px;"></div>
+    </div>
+
+    <!-- Part # and Description always visible (even in Quick Send mode) -->
     <label for="partNumber">Part Number</label>
     <input type="text" id="partNumber" placeholder="e.g. W11396618"
            autocapitalize="characters" autocomplete="off" spellcheck="false">
 
     <label for="partDesc">Part Description</label>
     <input type="text" id="partDesc" placeholder="e.g. Control Board, Thermal Fuse">
-
-    <label>Status</label>
-    <div class="toggle-group">
-      <button class="toggle-btn active" data-status="aa">Aa (Awaiting Approval)</button>
-      <button class="toggle-btn" data-status="date">Approved (Date)</button>
-    </div>
-    <!-- Date picker, shown only when "Approved" is selected -->
-    <div id="partDateRow" style="display:none; margin-top:8px;">
-      <input type="date" id="partDate" style="width:100%; padding:16px 18px; background:#0d1220;
-        border:2px solid #2a3040; border-radius:6px; color:#f0f0f0; font-size:18px;">
-    </div>
-
-    <!-- Warranty toggle — highlights row yellow in the sheet -->
-    <label style="margin-top:16px; display:flex; align-items:center; gap:10px; cursor:pointer;
-      text-transform:none; font-size:14px; color:#f0f0f0; letter-spacing:0;">
-      <input type="checkbox" id="partWarranty" style="width:20px; height:20px; accent-color:#e94560;">
-      Warranty (highlight row yellow)
-    </label>
-
-    <label>Preview (Column C format)</label>
-    <div class="note-preview" id="partPreview" style="min-height:40px;"></div>
 
     <button class="btn-primary" id="sendToSheetBtn">Send to Google Sheet</button>
     <button class="btn-secondary" id="addAnotherPartBtn">+ Add Another Part (Same Customer)</button>
@@ -2408,6 +2466,34 @@ ${closingLine}`;
       }
     }
 
+    // ============================================================
+    // QUICK SEND MODE — Collapse form after first part sent
+    // ============================================================
+
+    let quickSendActive = false;
+
+    function activateQuickSend() {
+      quickSendActive = true;
+      const strip = document.getElementById('partsContextStrip');
+      const form = document.getElementById('partsFullForm');
+
+      // Update strip with current values
+      document.getElementById('stripCustomer').textContent =
+        document.getElementById('partCustomer').value || '—';
+      document.getElementById('stripInvoice').textContent =
+        document.getElementById('partInvoice').value || '—';
+      document.getElementById('stripStatus').textContent = getPartStatusValue();
+
+      strip.classList.add('visible');
+      form.classList.add('collapsed');
+    }
+
+    // Toggle Quick Send form expansion
+    document.getElementById('partsContextStrip').addEventListener('click', () => {
+      const form = document.getElementById('partsFullForm');
+      form.classList.toggle('collapsed');
+    });
+
     // Send to Google Sheet — sends current part, then clears part # and desc
     document.getElementById('sendToSheetBtn').addEventListener('click', async () => {
       const sendBtn = document.getElementById('sendToSheetBtn');
@@ -2421,6 +2507,9 @@ ${closingLine}`;
         document.getElementById('partNumber').value = '';
         document.getElementById('partDesc').value = '';
         updatePartPreview();
+        if (!quickSendActive) {
+          activateQuickSend();
+        }
       }
 
       sendBtn.textContent = 'Send to Google Sheet';
@@ -2445,6 +2534,9 @@ ${closingLine}`;
         document.getElementById('partDesc').value = '';
         updatePartPreview();
         document.getElementById('partNumber').focus();
+        if (!quickSendActive) {
+          activateQuickSend();
+        }
       }
     });
 
@@ -2461,6 +2553,10 @@ ${closingLine}`;
       document.getElementById('partDateRow').style.display = 'none';
       document.getElementById('partWarranty').checked = false;
       updatePartPreview();
+      // Reset Quick Send mode
+      quickSendActive = false;
+      document.getElementById('partsContextStrip').classList.remove('visible');
+      document.getElementById('partsFullForm').classList.remove('collapsed');
     });
 
     // Reset Sheet URL — in case the saved URL is wrong
