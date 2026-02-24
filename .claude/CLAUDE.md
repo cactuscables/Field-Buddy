@@ -25,7 +25,7 @@ git add -A && git commit -m "description" && git push origin main
 ```
 GitHub Pages serves from `main` branch automatically. Changes are live in ~60 seconds.
 
-**Important:** After updating `sw.js`, bump `CACHE_NAME` version (currently `'tech-portal-v4'`) so browsers pick up the new service worker.
+**Important:** After updating `sw.js`, bump `CACHE_NAME` version (currently `'tech-portal-v5'`) so browsers pick up the new service worker.
 
 ## Navigation Structure
 
@@ -67,7 +67,8 @@ const currentJob = {
 - Model number input with camera button for OCR
 - Brand auto-detection from model prefix patterns
 - 12 brand chips for manual override
-- Search generates deep-links to parts sites (Marcone, Sears Parts Direct, Reliable Parts + brand-specific)
+- Search generates deep-links to parts sites (Marcone, Sears Parts Direct, Reliable Parts, Appliantology + brand-specific)
+- Appliantology link searches downloadable files (service manuals, tech sheets) via `_nodeSelectName=downloads_file_node` filter
 - "Open All" button opens all sites at once
 - Auto-copies model to clipboard, auto-updates job context
 
