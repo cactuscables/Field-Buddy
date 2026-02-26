@@ -1,12 +1,15 @@
 // Service Worker for Tech Portal PWA
 // This file makes the app work offline by caching resources
 
-const CACHE_NAME = 'tech-portal-v5';
+// Bump version when index.html or assets change — forces browser to re-cache
+const CACHE_NAME = 'tech-portal-v6';
 
 // Files to cache for offline use
 const ASSETS_TO_CACHE = [
   '/',
-  '/index.html'
+  '/index.html',
+  '/icon-192.png',
+  '/icon-512.png'
 ];
 
 // When the service worker is first installed, cache our app files

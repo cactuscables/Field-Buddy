@@ -10,6 +10,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Tech Portal">
   <link rel="manifest" href="manifest.json">
+  <!-- iOS Safari uses apple-touch-icon for home screen, not the manifest -->
+  <link rel="apple-touch-icon" href="icon-192.png">
   <!-- Tesseract.js for OCR — runs entirely in the browser, no server needed -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <!-- Industrial typography — Barlow Condensed for headers/labels -->
@@ -882,15 +884,51 @@
 /* ========================================
    NOTES TAB IMPROVEMENTS
    ======================================== */
-/* Sticky notes action bar */
+/* Notes action bar — static (was sticky, but eats space when iPhone keyboard is up) */
 .notes-sticky-footer {
-  position: sticky;
-  bottom: 80px;
+  position: static;
   background: var(--bg);
   padding: 12px 0;
   border-top: 2px dashed var(--border);
-  margin-top: 20px;
-  z-index: 10;
+  margin-top: 12px;
+}
+
+/* Notes tab condensed sizing — reclaim vertical space for iPhone keyboard */
+#notes label {
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+
+#notes label:first-child {
+  margin-top: 0;
+}
+
+#notes input[type="text"],
+#notes select,
+#notes textarea {
+  min-height: 44px;
+  padding: 10px 18px;
+  font-size: 16px;
+}
+
+#notes .toggle-btn {
+  min-height: 44px;
+  padding: 10px;
+}
+
+#notes .bullet-row {
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+#notes .remove-bullet {
+  width: 44px;
+  height: 44px;
+}
+
+#notes.tab-content {
+  padding: 12px 16px;
+  padding-bottom: 100px;
 }
 
 /* Collapsible preview */
@@ -965,6 +1003,63 @@
 
 .parts-full-form.collapsed {
   display: none;
+}
+
+/* ========================================
+   RESOURCES TAB — Manufacturer phone list
+   ======================================== */
+.resource-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 10px;
+  min-height: 56px;
+}
+
+.resource-item .resource-info {
+  flex: 1;
+}
+
+.resource-item .resource-name {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.resource-item .resource-phone {
+  margin-top: 4px;
+}
+
+.resource-item .resource-phone a {
+  color: var(--secondary);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: 15px;
+}
+
+.resource-item .resource-notes {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.resource-item .resource-delete {
+  background: rgba(233, 69, 96, 0.15);
+  border: none;
+  color: var(--primary);
+  font-size: 18px;
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: 12px;
 }
 
 /* ========================================
@@ -1145,8 +1240,6 @@
         Warranty (highlight row yellow)
       </label>
 
-      <label>Preview (Column C format)</label>
-      <div class="note-preview" id="partPreview" style="min-height:40px;"></div>
     </div>
 
     <!-- Part # and Description always visible (even in Quick Send mode) -->
@@ -1156,6 +1249,10 @@
 
     <label for="partDesc">Part Description</label>
     <input type="text" id="partDesc" placeholder="e.g. Control Board, Thermal Fuse">
+
+    <!-- Preview moved outside partsFullForm — stays visible in Quick Send mode -->
+    <label>Preview (Column C format)</label>
+    <div class="note-preview" id="partPreview" style="min-height:40px;"></div>
 
     <button class="btn-primary" id="sendToSheetBtn">Send to Google Sheet</button>
     <button class="btn-secondary" id="addAnotherPartBtn">+ Add Another Part (Same Customer)</button>
@@ -1213,6 +1310,24 @@
     </button>
   </div>
 
+  <!-- ==================== RESOURCES TAB ==================== -->
+  <div id="resources" class="tab-content">
+    <label>Search</label>
+    <input type="text" id="resourceSearch" placeholder="Search manufacturers..." autocomplete="off" spellcheck="false">
+
+    <label>Manufacturer Contacts</label>
+    <div id="resourceList"></div>
+
+    <hr class="section-divider">
+    <label>Add New Contact</label>
+    <input type="text" id="resourceName" placeholder="Manufacturer name (e.g. Whirlpool)">
+    <label for="resourcePhone">Phone Number</label>
+    <input type="text" id="resourcePhone" placeholder="e.g. 800-253-1301">
+    <label for="resourceNotes">Notes (optional)</label>
+    <input type="text" id="resourceNotes" placeholder="e.g. Parts dept, hours">
+    <button class="btn-primary" id="addResourceBtn">Add Contact</button>
+  </div>
+
   <!-- OCR Processing Overlay -->
   <div class="ocr-overlay" id="ocrOverlay">
     <img class="ocr-preview" id="ocrPreview" alt="Captured image">
@@ -1258,6 +1373,10 @@
       <div class="menu-item" data-menu-tab="stock">
         <span class="menu-item-icon">&#128666;</span>
         <span class="menu-item-label">Truck Stock</span>
+      </div>
+      <div class="menu-item" data-menu-tab="resources">
+        <span class="menu-item-icon">&#128222;</span>
+        <span class="menu-item-label">Resources</span>
       </div>
     </div>
   </div>
@@ -2238,25 +2357,63 @@ ${closingLine}`;
       const candidates = [];
       const seen = new Set();
 
-      // ---- STEP 1: Look for labeled values ----
-      // High-confidence matches — the value right after a label keyword.
-      // Covers many formats: MOD., Model:, M/N, Service no., ART. NO., SERIAL NO., etc.
+      // ---- PHASE 1: Line-based label matching (highest confidence) ----
+      // Split into lines and check each line for label keywords.
+      // Extracts the token immediately after the label on the SAME line,
+      // preventing cross-line false matches (e.g. "Model:" on line 1
+      // accidentally grabbing a serial from line 2).
+      const lines = rawText.split(/\n/);
+
+      // Label keywords mapped to their type
+      const lineLabels = [
+        // Model labels
+        { pattern: /(?:^|[\s,;])(?:MOD(?:EL)?\.?\s*(?:NUMBER|NO\.?|#)?|M\/N|M:)\s*[:.]?\s*/i, type: 'model' },
+        // Serial labels
+        { pattern: /(?:^|[\s,;])(?:SER(?:IAL)?\.?\s*(?:NUMBER|NO\.?|#)?|S\/N|S:)\s*[:.]?\s*/i, type: 'serial' },
+        // Stock number
+        { pattern: /(?:^|[\s,;])STOCK\s*(?:NUMBER|NO\.?|#)?\s*[:.]?\s*/i, type: 'model' },
+        // Service number
+        { pattern: /(?:^|[\s,;])SERVICE\s*(?:NO\.?|NUMBER|#)\s*[:.]?\s*/i, type: 'model' },
+        // Article / Part number
+        { pattern: /(?:^|[\s,;])(?:ART(?:ICLE)?\.?\s*(?:NO\.?|NR\.?|NUMBER|#)|P\/N|PART\s*(?:NO\.?|NUMBER|#))\s*[:.]?\s*/i, type: 'part' },
+        // Type label
+        { pattern: /(?:^|[\s,;])TYPE\.?\s*[:.]?\s*/i, type: 'model' },
+      ];
+
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        lineLabels.forEach(({ pattern, type }) => {
+          const match = pattern.exec(trimmed);
+          if (!match) return;
+
+          // Extract text after the label on this line
+          const afterLabel = trimmed.substring(match.index + match[0].length).trim();
+          // Grab the first token (alphanumeric with dashes/dots)
+          const tokenMatch = afterLabel.match(/^([A-Za-z0-9][\w\-\.]{3,})/);
+          if (!tokenMatch) return;
+
+          const value = tokenMatch[1].replace(/[^A-Za-z0-9\-]/g, '').toUpperCase();
+          if (value.length >= 4 && !seen.has(value)) {
+            seen.add(value);
+            const tagName = type === 'serial' ? 'Serial (from label)'
+              : type === 'part' ? 'Part number (from label)'
+              : 'Model (from label)';
+            candidates.push({ text: value, tag: tagName });
+          }
+        });
+      });
+
+      // ---- PHASE 2: Full-text regex fallback ----
+      // Catches anything Phase 1 missed (e.g. unusual formatting)
       const labelPatterns = [
-        // Model labels: MODEL NUMBER, MODEL NO., MODEL NO:, MODEL#, MODEL:, MOD., M/N
-        // The (?:NUMBER|NO\.?|#) group is key — without it, "MODEL NUMBER" would
-        // capture "NUMBER" as the value instead of the actual model number after it
         { regex: /(?:MOD(?:EL)?\.?\s*(?:NUMBER|NO\.?|#)?\s*[:.]?\s*|M\/N\s*[:.]?\s*)([A-Za-z0-9][\w\-\.]{3,})/gi, type: 'model' },
-        // Serial labels: SERIAL NUMBER, SERIAL NO., SER., S/N
         { regex: /(?:SER(?:IAL)?\.?\s*(?:NUMBER|NO\.?|#)?\s*[:.]?\s*|S\/N\s*[:.]?\s*)([A-Za-z0-9][\w\-\.]{3,})/gi, type: 'serial' },
-        // Stock number (Whirlpool uses this)
         { regex: /(?:STOCK\s*(?:NUMBER|NO\.?|#)?\s*[:.]?\s*)([A-Za-z0-9][\w\-\.]{3,})/gi, type: 'model' },
-        // Service no. / Service number (Miele, Bosch, European brands)
         { regex: /(?:SERVICE\s*(?:NO\.?|NUMBER|#)\s*[:.]?\s*)([A-Za-z0-9][\w\-\.]{3,})/gi, type: 'model' },
-        // ART. NO. / Article Number / Art. Nr. (European brands)
         { regex: /(?:ART(?:ICLE)?\.?\s*(?:NO\.?|NR\.?|NUMBER|#)\s*[:.]?\s*)([A-Za-z0-9][\w\-\.\/]{3,})/gi, type: 'part' },
-        // P/N, Part No., Part Number
         { regex: /(?:P\/N\s*[:.]?\s*|PART\s*(?:NO\.?|NUMBER|#)\s*[:.]?\s*)([A-Za-z0-9][\w\-\.]{3,})/gi, type: 'part' },
-        // TYPE / Type: (some brands label model as "Type")
         { regex: /(?:TYPE\.?\s*[:.]?\s*)([A-Za-z0-9][\w\-\.]{3,})/gi, type: 'model' },
       ];
 
@@ -2274,7 +2431,7 @@ ${closingLine}`;
         }
       });
 
-      // ---- STEP 2: Find other alphanumeric codes that look like model/serial ----
+      // ---- PHASE 3: Token heuristic — find unlabeled alphanumeric codes ----
       const cleanedText = rawText.replace(/[|\\\/\[\]{}()]/g, ' ');
       const tokens = cleanedText
         .split(/[\s,;:]+/)
@@ -2838,6 +2995,98 @@ ${closingLine}`;
     });
 
     // ============================================================
+    // RESOURCES TAB — Manufacturer phone numbers
+    // ============================================================
+
+    function getResources() {
+      return JSON.parse(localStorage.getItem('fb_resources') || '[]');
+    }
+
+    function saveResources(resources) {
+      localStorage.setItem('fb_resources', JSON.stringify(resources));
+    }
+
+    function renderResources(filter) {
+      const resources = getResources();
+      const list = document.getElementById('resourceList');
+      const term = (filter || '').trim().toLowerCase();
+
+      // Sort alphabetically by name
+      resources.sort((a, b) => a.name.localeCompare(b.name));
+
+      const visible = term
+        ? resources.filter(r =>
+            r.name.toLowerCase().includes(term) ||
+            r.phone.includes(term) ||
+            (r.notes || '').toLowerCase().includes(term))
+        : resources;
+
+      if (visible.length === 0) {
+        list.innerHTML = '<div class="empty-state">' +
+          (term ? 'No contacts match that search' : 'No contacts yet — add one below') +
+          '</div>';
+        return;
+      }
+
+      list.innerHTML = '';
+      visible.forEach((item, idx) => {
+        const div = document.createElement('div');
+        div.className = 'resource-item';
+        div.innerHTML = `
+          <div class="resource-info">
+            <div class="resource-name">${item.name}</div>
+            <div class="resource-phone"><a href="tel:${item.phone.replace(/[^\d+]/g, '')}">${item.phone}</a></div>
+            ${item.notes ? '<div class="resource-notes">' + item.notes + '</div>' : ''}
+          </div>
+          <button class="resource-delete" data-idx="${idx}" title="Delete">&times;</button>
+        `;
+        // Delete handler — find the actual index in the full (unfiltered) array
+        div.querySelector('.resource-delete').addEventListener('click', () => {
+          const all = getResources();
+          all.sort((a, b) => a.name.localeCompare(b.name));
+          const toRemove = visible[idx];
+          const realIdx = all.findIndex(r => r.name === toRemove.name && r.phone === toRemove.phone);
+          if (realIdx !== -1) {
+            all.splice(realIdx, 1);
+            saveResources(all);
+            renderResources(document.getElementById('resourceSearch').value);
+            showToast('Contact deleted');
+          }
+        });
+        list.appendChild(div);
+      });
+    }
+
+    // Search filtering
+    document.getElementById('resourceSearch').addEventListener('input', (e) => {
+      renderResources(e.target.value);
+    });
+
+    // Add new contact
+    document.getElementById('addResourceBtn').addEventListener('click', () => {
+      const name = document.getElementById('resourceName').value.trim();
+      const phone = document.getElementById('resourcePhone').value.trim();
+      const notes = document.getElementById('resourceNotes').value.trim();
+
+      if (!name || !phone) {
+        showToast('Need at least name and phone');
+        return;
+      }
+
+      const resources = getResources();
+      resources.push({ name, phone, notes });
+      saveResources(resources);
+
+      // Clear form
+      document.getElementById('resourceName').value = '';
+      document.getElementById('resourcePhone').value = '';
+      document.getElementById('resourceNotes').value = '';
+
+      renderResources(document.getElementById('resourceSearch').value);
+      showToast('Contact added');
+    });
+
+    // ============================================================
     // INITIALIZATION
     // ============================================================
 
@@ -2845,6 +3094,7 @@ ${closingLine}`;
     renderHistory();
     renderSavedNotes();
     renderPartsLog();
+    renderResources(); // Load manufacturer contacts
     loadCachedStock(); // Load any cached truck stock data
     loadJob(); // Restore persisted job context
 

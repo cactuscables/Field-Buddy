@@ -7,7 +7,7 @@ A Progressive Web App for appliance repair workflow. Used daily on iPhone Safari
 **Repo:** https://github.com/cactuscables/Field-Buddy
 
 ## Architecture
-- **Single-file PWA** — all HTML, CSS, and JS live in `index.html` (~2400 lines)
+- **Single-file PWA** — all HTML, CSS, and JS live in `index.html` (~2700 lines)
 - **No build step** — edit `index.html` directly, deploy via `git push` to GitHub Pages
 - **No frameworks** — vanilla HTML/CSS/JS only
 - **Offline-capable** via service worker (`sw.js`) with network-first, cache-fallback strategy
@@ -25,7 +25,7 @@ git add -A && git commit -m "description" && git push origin main
 ```
 GitHub Pages serves from `main` branch automatically. Changes are live in ~60 seconds.
 
-**Important:** After updating `sw.js`, bump `CACHE_NAME` version (currently `'tech-portal-v5'`) so browsers pick up the new service worker.
+**Important:** After updating `sw.js`, bump `CACHE_NAME` version (currently `'tech-portal-v6'`) so browsers pick up the new service worker.
 
 ## Navigation Structure
 
@@ -37,6 +37,7 @@ GitHub Pages serves from `main` branch automatically. Changes are live in ~60 se
 ### Menu Drawer (via "More" button)
 - **History** — past searches
 - **Stock** — truck inventory
+- **Resources** — manufacturer phone numbers (one-tap calling)
 
 ### Job Context Bar (sticky header)
 - Shows "TECH PORTAL" when no job is active
@@ -78,7 +79,8 @@ const currentJob = {
 - Model/Serial auto-filled from job context
 - **Enter key** in a bullet input creates the next bullet
 - **Collapsible preview** (collapsed by default, saves space)
-- **Sticky action footer** — Copy and Copy & Open Dispatch buttons always visible
+- **Condensed layout** — inputs, toggles, and bullets sized smaller (44px touch targets) to maximize visible area when iPhone keyboard is up
+- **Inline action buttons** — Copy and Copy & Open Dispatch scroll with content (not sticky, to save vertical space)
 - Save/load notes to localStorage
 
 ### Parts Tab
@@ -93,8 +95,14 @@ const currentJob = {
 - Tesseract.js for in-browser OCR of model/serial tags
 - Auto-rotate: tries 0°, 90°, 270° for sideways tags
 - Image preprocessing and downscaling for performance
-- Smart label detection (MOD., SER., MODEL, SERIAL patterns)
+- Smart label detection: Phase 1 line-based matching (highest confidence), Phase 2 full-text regex fallback, Phase 3 token heuristics
 - Results flow to job context automatically
+
+### Resources Tab
+- Searchable list of manufacturer phone numbers
+- One-tap calling via `tel:` links
+- Add/delete contacts with optional notes
+- Stored in localStorage (`fb_resources`), alphabetically sorted
 
 ### Truck Stock
 - Fetches inventory from separate Google Apps Script
@@ -140,6 +148,7 @@ All colors, fonts, and spacing defined as CSS variables:
 - `fb_truck_stock_url` — Google Apps Script URL for stock
 - `fb_truck_stock` — cached stock data
 - `fb_parts_log` — sent parts log (max 200)
+- `fb_resources` — manufacturer phone contacts
 
 ## Gotchas
 - **Toggle button selectors must be scoped** — Notes uses `.toggle-btn[data-type]`, Parts uses `.toggle-btn[data-status]`. Using unscoped `.toggle-btn` will create cross-tab listener collisions.
